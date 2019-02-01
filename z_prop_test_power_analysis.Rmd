@@ -1,0 +1,138 @@
+---
+title: "z_prop_test_power_analysis"
+author: "Matthew Gregory"
+date: "01/02/2019"
+output:
+  md_document:
+    variant: markdown_github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Power analysis for related links proportion z test
+
+[GOV.UK](https://www.gov.uk/) is a popular website. According to Google Analytics, it gets several million [active users](https://support.google.com/analytics/answer/6171863?hl=en) everyday.  
+
+For our analytical purposes our experimental unit is at the level of the active user journey [session](https://support.google.com/analytics/answer/6086069?hl=en). We need a given number of user sessions to achieve our desired statistical power.  
+
+This doc walks us through the thinking and calculations prior to initiating the experiment. It gives us our stopping distance (when can we look at the data and conduct the analysis as part of a valid experiment).  
+
+## Assumptions
+
+We assume independent observations; each session is independent.  This basically means that the journey of a user session must be independent of the journey of any other user session. We also assume randomised assignment to page variant type. Once assigned a cookie, a user will only see page variants of one type (A or B), thus completing a journey exposed to just one treatment.   
+
+## Metric of interest
+
+Null hypothesis - There is no difference in the proportion of user journey sessions that click on at least one related link between page A and page B.  
+
+journey_click_rate = total number of journeys including at least one click on a related linktotal number of journeys  
+H0: journey_click_rateA = journey_click_rateB  
+H1: journey_click_rateA ≠ journey_click_rateB  
+
+### More generally
+
+See the appendix for more detail on A/B testing with proportion data (where we know how many times an event did and didn't happen).  
+
+## Effect size 
+
+5% relative increase is our “go-to” effect size we are interested in detecting (a rule of thumb industry standard). This is in part, due to the novelty of some of these metrics and their derived nature which makes it difficult to have any preconceived expectations.
+
+## How many sessions do we need to be able to test our null hypothesis?
+
+To estimate sample size we need these parameters:
+
+* Current Rate or baseline Related Link Click rate  
+* Effect size or Minimum Detectable Change (the minimum change you want to be able to detect)  
+* Statistical Significance: the probability of mistakenly rejecting the null hypothesis (H~0~) if it were true  
+* Statistical Power: probability of correctly rejecting the null hypothesis (H~0~) when the alternative (H~1~) is true. In other words, the ability of a test to detect an effect if the effect actually exists.  
+
+We can do this in R easily enough:  
+
+How many user journey sessions (n) do we need per page variant to be able to detect a 5% relative difference in related link click through rate (p~A~)? Let’s take the most extreme example to ensure we have sufficient power.  
+
+
+```{r}
+# The baseline rate varies on assumptions in the data pipeline
+# and the data sample, we use the most conservative (nearest to zero)
+
+# sample size required for each group (so times n by 2)
+# to detect 5% relative change in 
+# note how p1 - p2 gives a 5% relative change, the effect size
+
+m1 <- power.prop.test(p1 = .01, p2 = .0105,
+                      power = 0.8, sig.level = 0.01)
+m1
+```
+
+### Validate assumptions
+
+As proportion data is bounded at zero and one, we can use a normal approximation to model the difference between the means if they are relatively far from the bounds given the sample size. We assess this now.  
+
+The formula of z-statistic is valid only when sample size (n) is large enough. nAp, nAq, nBp and nBq should be ≥ 5.  
+
+```{r}
+# in the same order
+# where p is probability of success (we can use current baseline)
+# q = 1 - p
+
+# page A
+p <- m1$p1
+q <- 1 - m1$p1
+(m1$n * c(p, q)) >= 5
+
+# page B
+p <- m1$p2
+q <- 1 - m1$p2
+(m1$n * c(p, q)) >= 5
+
+```
+
+The large samples collapses the distribution such that we are not in danger of breaching zero or one.  
+
+## Controlling for big data
+
+GOV.UK gets alot of visitors, how can we avoid drowning in data but still capture the different user journey sessions that might occurr during the week (control for weekday / weekend affects by including the data).  
+
+
+
+how can we sample from a week's worth of data to meet our desired sample size? This is so we control for weekday, weekend effects.
+
+```{r}
+print("Read in some GA daily active user count data...")
+
+print("Where active user counts capture: the number
+      of unique users who initiated sessions on your site ")
+# active users may have more than one session per day
+
+library(tidyverse)
+```
+
+## Appendix
+
+With proportions we are dealing with a numerator and a denominator. We know the number of times an event did happen and did not happen (this contrasts with count data where we know how often an event did happen but don’t know how often it didn’t happen) across each journey (unique Sequence).  
+
+If X is the number of successes and n is the number of trials then, then p is the probability of success. The probability of failure, is q or 1 - p. So for metric 2a, a success would be a journey (‘Sequence’ in the data pipeline language) with at least one related link clicked during it, multiplied by the number of occurrences of that journey. The number of trials would be the sum of journeys multiplied by their respective occurrences.  
+
+pA = XA / nA  
+pB = XB / nB  
+
+The simplest and most frequently used modelling approach is to aggregate all the data together by page variant (as above). For comparison of these two observed proportions we can use the two-proportions z-test . We want to know, whether the proportions of clickers are the same in the two groups of user journeys.  
+
+The test statistic can be calculated as follows:  
+
+z = pA - pBpq/nA + pq/nB  
+ 
+where,  
+
+pA is the proportion observed in group A with size nA  
+pB is the proportion observed in group B with size nB  
+p and q are the overall proportions  
+
+Note that, the formula of z-statistic is valid only when sample size (n) is large enough. nAp, nAq, nBp and nBq should be ≥ 5. Thus we should check this in turn with each metric in our exploration of some baseline data prior to the experiment.  
+
+```{r}
+devtools::session_info()
+```
+
