@@ -11,6 +11,11 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+```
+
+
 ## Power analysis for related links proportion z test
 
 [GOV.UK](https://www.gov.uk/) is a popular website. According to Google Analytics, it gets several million [active users](https://support.google.com/analytics/answer/6171863?hl=en) everyday.  
@@ -51,6 +56,8 @@ To estimate sample size we need these parameters:
 We can do this in R easily enough:  
 
 How many user journey sessions (n) do we need per page variant to be able to detect a 5% relative difference in related link click through rate (p~A~)? Let’s take the most extreme example to ensure we have sufficient power.  
+
+(We use standard alpha and beta values, although our alpha value was set at the industry standard of 0.05, we had to control for multiple comparisons thus brining it down to ~ 0.01. At this level we would expect a false positive 5% of the time; not 1%.)  
 
 
 ```{r}
@@ -93,21 +100,129 @@ The large samples collapses the distribution such that we are not in danger of b
 
 ## Controlling for big data
 
-GOV.UK gets alot of visitors, how can we avoid drowning in data but still capture the different user journey sessions that might occurr during the week (control for weekday / weekend affects by including the data).  
+GOV.UK gets alot of visitors, how can we avoid drowning in data (RAM and compute limitations) but still capture the different user journey sessions that might occurr during the week (control for weekday / weekend affects by including the data).  
 
+We also want to mitigate getting too large a sample size (not strictly a bad thing if we communicate correctly), as n tends to infinite, the p-value of a statistical test between two proportions will tend to zero (this is because the measurement becomes more and more precise; it doesn't necessarily mean the difference is practically significant or meaningful).  
 
+## How to sample a week's worth of data to get N
 
-how can we sample from a week's worth of data to meet our desired sample size? This is so we control for weekday, weekend effects.
+Our power analysis described n, the sample size per variant required as `r round(m1$n, 0)`. We are interested in getting twice that, what we call N, `r round(m1$n, 0)*2`.  
 
 ```{r}
-print("Read in some GA daily active user count data...")
-
-print("Where active user counts capture: the number
-      of unique users who initiated sessions on your site ")
-# active users may have more than one session per day
-
-library(tidyverse)
+N <- round(m1$n, 0)*2
+N
 ```
+
+
+If we consider a typical week (2019-01-25-2019-01-31), we can work backwards to ascertain how to sample from each day to get sufficient data for our z proportion test comparing the means of page A and page B variants. We are interested in drawing from a week's worth of data as it captures the putatively different types of journeys seen on weekdays and weekends which might be affected differently by changes to the related links served.  
+
+Given N, we would need approximately 1.0 million users to make journeys on both page variants A and B. So how long does it take to get 2.0 million users to visit GOV.UK? A quick look at Google Analytics suggests we get over 3 million sessions for weekdays and over 2 million for weekends.
+
+```{r}
+# a mix of base R and tidyverse code
+
+# skip and nrows combined to take a slice of rows
+df <- read.csv("data/20190125-20190131_active_users.csv",
+               header = TRUE, skip = 6, nrows=7,
+               colClasses = "character",
+               stringsAsFactors = FALSE)
+
+replaceCommas<-function(x){
+  x<-as.numeric(gsub("\\,", "", x))
+}
+
+df$X1.Day.Active.Users <- replaceCommas(df$X1.Day.Active.Users) %>%
+  as.numeric() 
+
+df <- dplyr::rename(df, date = Day.Index, 
+                    users = X1.Day.Active.Users) %>%
+  mutate(date = readr::parse_date(date, format = "%d/%m/%Y")) %>%
+  mutate(the_day = weekdays(date))
+
+df
+
+```
+
+Our first question should be whether we can get N with one weeks data? This is obvious from the table, where one day provides sufficient active users. Even if we are conservative that one active user only has one session we have sufficient sessions to meet N (assuming random assignment to page variant for each active user).  
+
+```{r}
+# can we get that within a weeks data?
+print(paste("It is ", sum(df$users) > (m1$n) * 2, " that one week provides sufficient sample size."))
+```
+
+Considering how much data we can hold in RAM on a local machine and how to sample user journey sessions from each day, followed by aggregation of all days data: how best to go about sampling from the week?
+
+```{r}
+# a week's worth
+week_total <- sum(df$users)
+week_total
+
+# ratio of what is required to what is available
+(N/week_total)*100
+
+```
+
+So if we need `r N` from a weeks worth of data `r week_total`, that means we can reduce our sampling effort by a factor of 12 from each day and still have sufficient data.  
+
+```{r}
+# we need to sum the week's worth then sample a prop of each day
+# to contribute to the total n*2 required
+
+df <- df %>%
+  mutate(prop_of_week_total = round(users / sum(users), 2))
+# looks like people start to clock off from work on Friday already!
+
+# let' call n*2, N
+df <- mutate(df,
+             n_req_by_sampling =
+               (users*prop_of_week_total))
+
+df
+
+# let's double check that if we did sample from these days
+# at these rates, we would have sufficinet N
+
+sum(df$n_req_by_sampling) > N
+```
+
+This works out as essentially we are saying one day meets our data needs, but lets instead sample from the whole week so we end up with the same amount of data as one would get in a day.  
+
+```{r}
+# sanity check
+sum(df$n_req_by_sampling)
+```
+
+## Want more data?
+
+By sampling we are losing information. We should get the data we need to perform our statistical test, but let's say we wanted to add some complexity to the model. We would then need additional data to provide the information for a more complex model. This could be simply achieved by increasing the `prop_of_week_total` by a factor (i.e. 2 or 3) to get more data.  
+
+This sampling step should be done in the Big Query pipeline when retrieving your data if possible.  
+
+```{r}
+df <- df %>%
+  mutate(prop_of_week_total_doubled = prop_of_week_total*2,
+         n_req_by_sampling_doubled = n_req_by_sampling*2)
+
+df
+```
+
+```{r}
+# sanity check
+sum(df$n_req_by_sampling_doubled)
+```
+
+This doesn't necessarily reflect the number of rows in the dataframe, as this captures the number of occurrences of Sequences. The experimental unit is at the level of a user session with a specific Sequence (user journey of page views and events), however for storage efficiency these are roled up.  
+
+Big query provides us with a generated Sequence of Events & Page Hits:
+Page url << Event Category <<: Event Level
+
+Thus when sampling from rows in our roled up daily data pipeline data, we should wait the probability of sampling by the occurrences of the associated Sequence.  
+
+We should make use of as much data is possible where we can to improve the precision of our coefficient estimates.  
+
+## References
+
+
 
 ## Appendix
 
@@ -135,4 +250,3 @@ Note that, the formula of z-statistic is valid only when sample size (n) is larg
 ```{r}
 devtools::session_info()
 ```
-
