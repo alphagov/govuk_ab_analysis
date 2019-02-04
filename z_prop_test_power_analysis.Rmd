@@ -32,13 +32,13 @@ We assume independent observations; each session is independent.  This basically
 
 Null hypothesis - There is no difference in the proportion of user journey sessions that click on at least one related link between page A and page B.  
 
-journey_click_rate = total number of journeys including at least one click on a related linktotal number of journeys  
+journey_click_rate = total number of journeys including at least one click on a related link / total number of journeys  
 H0: journey_click_rateA = journey_click_rateB  
 H1: journey_click_rateA ≠ journey_click_rateB  
 
 ### Baseline
 
-A power analysis needs to be flexible, exploratory, and well thought out. We [inspect historical data](https://github.com/alphagov/govuk-network-data/tree/master/notebooks/eda) to estimate a ball-park figure for what we expect the journey_click_rate to be for our experiment. This gives us an expected baseline for the control, or page A variant. The value varied from 1-5% given different data samples. We use the (statistically) worse-case scenario of 1% journey_click_rate, to be conservative in our ppower analysis, ensuring we get enough data.    
+A power analysis needs to be flexible, exploratory, and well thought out. We [inspect historical data](https://github.com/alphagov/govuk-network-data/tree/master/notebooks/eda) to estimate a ball-park figure for what we expect the journey_click_rate to be for our experiment. This gives us an expected baseline for the control, or page A variant. The value varied from 1-5% given different data samples. We use the (statistically) worse-case scenario of 1% journey_click_rate, to be conservative in our power analysis, ensuring we get enough data.    
 
 ### More generally
 
@@ -61,7 +61,7 @@ We can do this in R easily enough:
 
 How many user journey sessions (n) do we need per page variant to be able to detect a 5% relative difference in related link click through rate (p~A~)? Let’s take the most extreme example to ensure we have sufficient power.  
 
-(We use standard alpha and beta values, although our alpha value was set at the industry standard of 0.05, we had to control for multiple comparisons thus brining it down to ~ 0.01. At this level we would expect a false positive 5% of the time; not 1%.)  
+(We use standard alpha and beta values, although our alpha value was set at the industry standard of 0.05, we had to control for multiple comparisons thus bringing it down to ~ 0.01. At this level we would expect a false positive 5% of the time; not 1%.)  
 
 
 ```{r}
@@ -257,15 +257,17 @@ The simplest and most frequently used modelling approach is to aggregate all the
 
 The test statistic can be calculated as follows:  
 
-z = pA - pBpq/nA + pq/nB  
+$$z = \frac{(p_A - p_B) - 0} {\sqrt{(pq) (\frac{1}{n_A} + \frac{1}{n_B})}}$$
+
+  
  
 where,  
 
-pA is the proportion observed in group A with size nA  
-pB is the proportion observed in group B with size nB  
+p~A~ is the proportion observed in group A with size nA  
+p~B~ is the proportion observed in group B with size nB  
 p and q are the overall proportions  
 
-Note that, the formula of z-statistic is valid only when sample size (n) is large enough. nAp, nAq, nBp and nBq should be ≥ 5. Thus we should check this in turn with each metric in our exploration of some baseline data prior to the experiment.  
+Note that, the formula of z-statistic is valid only when sample size (n) is large enough. n~A~p, n~A~q, n~B~p and n~B~q should be ≥ 5. Thus we should check this in turn with each metric in our exploration of some baseline data prior to the experiment.  
 
 ```{r}
 devtools::session_info()

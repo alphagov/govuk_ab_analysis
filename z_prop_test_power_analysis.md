@@ -35,7 +35,7 @@ journey sessions that click on at least one related link between page A
 and page B.
 
 journey\_click\_rate = total number of journeys including at least one
-click on a related linktotal number of journeys  
+click on a related link / total number of journeys  
 H0: journey\_click\_rateA = journey\_click\_rateB  
 H1: journey\_click\_rateA ≠ journey\_click\_rateB
 
@@ -48,7 +48,7 @@ to estimate a ball-park figure for what we expect the
 journey\_click\_rate to be for our experiment. This gives us an expected
 baseline for the control, or page A variant. The value varied from 1-5%
 given different data samples. We use the (statistically) worse-case
-scenario of 1% journey\_click\_rate, to be conservative in our ppower
+scenario of 1% journey\_click\_rate, to be conservative in our power
 analysis, ensuring we get enough data.
 
 ### More generally
@@ -88,7 +88,7 @@ have sufficient power.
 
 (We use standard alpha and beta values, although our alpha value was set
 at the industry standard of 0.05, we had to control for multiple
-comparisons thus brining it down to ~ 0.01. At this level we would
+comparisons thus bringing it down to ~ 0.01. At this level we would
 expect a false positive 5% of the time; not 1%.)
 
 ``` r
@@ -442,18 +442,19 @@ two groups of user journeys.
 
 The test statistic can be calculated as follows:
 
-z = pA - pBpq/nA + pq/nB
+$$z = \\frac{(p\_A - p\_B) - 0} {\\sqrt{(pq) (\\frac{1}{n\_A} + \\frac{1}{n\_B})}}$$
 
 where,
 
-pA is the proportion observed in group A with size nA  
-pB is the proportion observed in group B with size nB  
+p<sub>A</sub> is the proportion observed in group A with size nA  
+p<sub>B</sub> is the proportion observed in group B with size nB  
 p and q are the overall proportions
 
 Note that, the formula of z-statistic is valid only when sample size (n)
-is large enough. nAp, nAq, nBp and nBq should be ≥ 5. Thus we should
-check this in turn with each metric in our exploration of some baseline
-data prior to the experiment.
+is large enough. n<sub>A</sub>p, n<sub>A</sub>q, n<sub>B</sub>p and
+n<sub>B</sub>q should be ≥ 5. Thus we should check this in turn with
+each metric in our exploration of some baseline data prior to the
+experiment.
 
 ``` r
 devtools::session_info()
