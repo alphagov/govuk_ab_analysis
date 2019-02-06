@@ -1,3 +1,19 @@
+# R
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data files
+.RData
+
+# OS
+# mac os
+.DS_Store
+
+# data
+*.csv
+
+# Python
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -102,3 +118,4 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+.Rproj.user
