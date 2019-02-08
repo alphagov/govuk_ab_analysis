@@ -12,6 +12,7 @@
 
 # data
 *.csv
+*.gz
 
 # Python
 # Byte-compiled / optimized / DLL files
