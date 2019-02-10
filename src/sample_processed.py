@@ -1,23 +1,24 @@
-#!/usr/bin/env python3
 import sys
-# .. other safe imports
+import os
+import random
+#.. other safe imports
 try:
-    import os
     import pandas as pd
-    import random
+    import numpy as np
     from numpy.random import choice
     # other unsafe imports
 except ImportError:
-    print("Error: missing one of the libraries (pandas, random or numpy)")
+    print("Error: missing one of the libraries (pandas or numpy)")
     sys.exit()
 
+print("other modules loaded")
 
 REQUIRED_COLUMNS = ["Occurrences", "ABVariant", "Sequence", 'Page_Event_List',
                     'Page_List', 'PageSequence', 'Event_List',
                     'num_event_cats', 'Event_cats_agg', 'Event_cat_act_agg']
 
 DATA_DIR = os.getenv("DATA_DIR")
-
+print(DATA_DIR)
 
 def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True):
     """
@@ -37,7 +38,11 @@ def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True)
        pandas.core.frame.DataFrame: A sampled data frame.
     """
 
-    path = os.path.join(DATA_DIR, "processed_journey", filename, ".csv.gz")
+    # having issue with global env, $PWD not recognised in pycharm, so can't use DATA_DIR
+    # assume current work dir is project dir
+    path = os.path.join(os.getcwd(), "data", "processed_journey", filename)
+    # the above adds slashes, need separate for file type
+    path = path + ".csv.gz"
 
     print("Reading in file...")
 
@@ -72,15 +77,18 @@ def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True)
 
     # return something to show it's worked
     print(df_sampled.info())
-    print(df_sampled.shape())
 
     print("Saving to data/sampled_journey")
     # slow and too big, need to roll up
+    return None
+
+
+print("function defined")
 
 
 def main(filename):
     sample_processed_journey(filename)
 
 
-if __name__ == "main":
+if __name__ == "__main__":  # our module is being executed as a program
     main(sys.argv[1])  # The 0th arg is the module filename
