@@ -93,7 +93,8 @@ def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True)
 
     out_path = os.path.join(DATA_DIR, "sampled_journey", filename)
     out_path = out_path + ".csv.gz"
-    df_sampled_grouped.to_csv(out_path, sep='\t', compression='gzip')
+    df_sampled_grouped.to_csv(out_path, sep='\t', compression='gzip',
+                              index=False)
     # slow and too big, need to roll up
 
     return None
