@@ -1,6 +1,8 @@
 import sys
 import os
-import random
+import argparse
+# import random
+import logging
 # .. other safe imports
 try:
     import pandas as pd
@@ -19,15 +21,18 @@ REQUIRED_COLUMNS = ["Occurrences", "ABVariant", 'Page_Event_List',
                     # 'num_event_cats', "Event_cats_agg"
                     ]
 
-DATA_DIR = os.getenv("DATA_DIR")
-print(DATA_DIR)
-
 
 def is_a_b(variant):
+    """
+    Is the value of the variant either 'A' or 'B'? Filters out junk data
+    :param variant:
+    :return: True or False
+    """
     return any([variant == x for x in ['A', 'B']])
 
 
-def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True):
+def sample_processed_journey(data_dir, filename, seed=1337, k=1000,
+                             with_replacement=True):
     """
     Samples from processed journey files.
 
@@ -36,9 +41,11 @@ def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True)
     that Sequence. This outputs a pandas Dataframe into the sampled_journey directory.
 
     Parameters:
+        data_dir: The directory processed_journey and sampled_journey can be
+            found in
         filename (str): The filename of the processed journey.
         seed (int): The random seed for reproducibility.
-        k (int): The output shape.
+        k (int): The output size.
         with_replacement (bool): Whether the sample is with or without replacement.
 
     Returns:
@@ -47,7 +54,7 @@ def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True)
 
     # having issue with global env, $PWD not recognised in pycharm, so can't use DATA_DIR
     # assume current work dir is project dir
-    in_path = os.path.join(DATA_DIR, "processed_journey", filename)
+    in_path = os.path.join(data_dir, "processed_journey", filename)
     # the above adds slashes, need separate for file type
     in_path = in_path + ".csv.gz"
 
@@ -55,11 +62,15 @@ def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True)
 
     df = pd.read_csv(in_path, sep='\t', usecols=REQUIRED_COLUMNS)
 
+    print(df.info())
+
     print("Finished reading, now removing any non A or B variants")
 
     # filter out any values like Object object
     df['is_a_b'] = df['ABVariant'].map(is_a_b)
-    df = df[df['is_a_b']]
+    df = df[df['is_a_b']][REQUIRED_COLUMNS]
+
+    print(df.info())
 
     # size should be an arg, what is the desired sample size we are after?
     # this will need to consider each day, and what day of the week it is
@@ -91,7 +102,7 @@ def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True)
 
     print("Saving to data/sampled_journey")
 
-    out_path = os.path.join(DATA_DIR, "sampled_journey", filename)
+    out_path = os.path.join(data_dir, "sampled_journey", filename)
     out_path = out_path + ".csv.gz"
     df_sampled_grouped.to_csv(out_path, sep='\t', compression='gzip',
                               index=False)
@@ -103,9 +114,35 @@ def sample_processed_journey(filename, seed=1337, k=1000, with_replacement=True)
 print("function defined")
 
 
-def main(filename):
-    sample_processed_journey(filename)
+# def main(filename):
+#     sample_processed_journey(filename)
 
 
 if __name__ == "__main__":  # our module is being executed as a program
-    main(sys.argv[1])  # The 0th arg is the module filename
+    parser = argparse.ArgumentParser(
+        description='Sampling processed data module')
+    parser.add_argument(
+        'filename', help='''
+        name of the file we want to sample, we add .csv.gz at the end so
+        don\'t worry about that. We will read from the processed_journey
+        directory in data, and write to the sampled_journey directory
+        ''')
+    parser.add_argument(
+        '--seed', help='seed for choosing sample', default=1337, type=int)
+    parser.add_argument(
+        '--k', help='number of journeys you want in your sampled dataframe',
+        default=1000, type=int)
+    # should we give people the opportunity to sample without replacement?
+    parser.add_argument(
+        '--with_replacement', default=True,
+        help='do you want to sample with or without replacement?', type=bool)
+    args = parser.parse_args()
+
+    DATA_DIR = os.getenv("DATA_DIR")
+    print(DATA_DIR)
+
+    print(args.seed)
+    print(args.k)
+    sample_processed_journey(DATA_DIR, args.filename, seed=args.seed,
+                             k=args.k, with_replacement=args.with_replacement)
+    # main(sys.argv[1])  # The 0th arg is the module filename
