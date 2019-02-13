@@ -6,19 +6,21 @@ import logging
 # .. other safe imports
 try:
     import pandas as pd
-    import numpy as np
-    from numpy.random import choice
+    # import numpy as np
+    # from numpy.random import choice
     # other unsafe imports
 except ImportError:
-    print("Error: missing one of the libraries (pandas or numpy)")
+    logging.error(("Missing pandas library"))
+    # raise ImportError("Missing pandas library")
     sys.exit()
 
-print("other modules loaded")
+logging.debug("other modules loaded")
 
-REQUIRED_COLUMNS = ["Occurrences", "ABVariant", 'Page_Event_List',
+
+# other cols we might want are:"Sequence", 'PageSequence', 'Event_List',
+# 'num_event_cats', "Event_cats_agg"
+REQUIRED_COLUMNS = ["Occurrences", "ABVariant", "Page_Event_List",
                     "Page_List",  "Event_cat_act_agg"
-                    # ,"Sequence", 'PageSequence', 'Event_List',
-                    # 'num_event_cats', "Event_cats_agg"
                     ]
 
 
@@ -58,19 +60,21 @@ def sample_processed_journey(data_dir, filename, seed=1337, k=1000,
     # the above adds slashes, need separate for file type
     in_path = in_path + ".csv.gz"
 
-    print("Reading in file...")
+    logger.info("Reading in file...")
 
     df = pd.read_csv(in_path, sep='\t', usecols=REQUIRED_COLUMNS)
 
-    print(df.info())
+    logger.debug('DataFrame shape' + str(df.shape))
 
-    print("Finished reading, now removing any non A or B variants")
+    logger.info("Finished reading, now removing any non A or B variants")
 
     # filter out any values like Object object
-    df['is_a_b'] = df['ABVariant'].map(is_a_b)
-    df = df[df['is_a_b']][REQUIRED_COLUMNS]
+    df["is_a_b"] = df["ABVariant"].map(is_a_b)
+    df = df[df["is_a_b"]][REQUIRED_COLUMNS]
 
-    print(df.info())
+    logger.debug('DataFrame shape' + str(df.shape))
+
+    logger.info("Finished removing any non A or B variants, now sampling")
 
     # size should be an arg, what is the desired sample size we are after?
     # this will need to consider each day, and what day of the week it is
@@ -90,28 +94,25 @@ def sample_processed_journey(data_dir, filename, seed=1337, k=1000,
     # df_sampled['Occurrences'] = 1
 
     # return something to show it's worked
-    print(df_sampled.info())
+    logger.debug('DataFrame shape' + str(df_sampled.shape))
 
-    print("rolling up data")
+    logger.info("rolling up data")
     cols_without_occurrences = REQUIRED_COLUMNS.copy()
-    cols_without_occurrences.remove('Occurrences')
+    cols_without_occurrences.remove("Occurrences")
     df_sampled_grouped = df_sampled.groupby(
         cols_without_occurrences).count().reset_index()
 
-    print(df_sampled_grouped.info())
+    logger.debug('DataFrame shape' + str(df_sampled_grouped.shape))
 
-    print("Saving to data/sampled_journey")
+    logger.debug("Saving to data/sampled_journey")
 
     out_path = os.path.join(data_dir, "sampled_journey", filename)
     out_path = out_path + ".csv.gz"
-    df_sampled_grouped.to_csv(out_path, sep='\t', compression='gzip',
+    df_sampled_grouped.to_csv(out_path, sep="\t", compression="gzip",
                               index=False)
     # slow and too big, need to roll up
 
     return None
-
-
-print("function defined")
 
 
 # def main(filename):
@@ -136,10 +137,19 @@ if __name__ == "__main__":  # our module is being executed as a program
     parser.add_argument(
         '--with_replacement', default=True,
         help='do you want to sample with or without replacement?', type=bool)
+    parser.add_argument('--debug-level', default="INFO",
+                        help='debug level of messages (DEBUG, INFO, WARNING'
+                             ' etc...)')
     args = parser.parse_args()
 
+    # Logger setup
+    # LOGGING_CONFIG = os.getenv("LOGGING_CONFIG")
+    # logging.config.fileConfig(LOGGING_CONFIG)
+    logger = logging.getLogger('sample_processed_journey')
+    logger.setLevel(getattr(logging, args.debug_level))
+
     DATA_DIR = os.getenv("DATA_DIR")
-    print(DATA_DIR)
+    logger.debug("data directory" + DATA_DIR)
 
     print(args.seed)
     print(args.k)
