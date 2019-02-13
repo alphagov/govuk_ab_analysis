@@ -2,7 +2,7 @@ import sys
 import os
 import argparse
 # import random
-import logging
+import logging.config
 # .. other safe imports
 try:
     import pandas as pd
@@ -143,16 +143,17 @@ if __name__ == "__main__":  # our module is being executed as a program
     args = parser.parse_args()
 
     # Logger setup
-    # LOGGING_CONFIG = os.getenv("LOGGING_CONFIG")
-    # logging.config.fileConfig(LOGGING_CONFIG)
+    LOGGING_CONFIG = os.getenv("LOGGING_CONFIG")
+    logging.config.fileConfig(LOGGING_CONFIG)
     logger = logging.getLogger('sample_processed_journey')
     logger.setLevel(getattr(logging, args.debug_level))
 
     DATA_DIR = os.getenv("DATA_DIR")
     logger.debug("data directory" + DATA_DIR)
 
-    print(args.seed)
-    print(args.k)
+    print()
+    logger.debug(f"Args: seed={args.seed}, k={args.k}, "
+                 f"with_replacement={args.with_replacement}")
     sample_processed_journey(DATA_DIR, args.filename, seed=args.seed,
                              k=args.k, with_replacement=args.with_replacement)
     # main(sys.argv[1])  # The 0th arg is the module filename
