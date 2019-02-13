@@ -7,11 +7,11 @@ import logging.config
 # .. other safe imports
 try:
     import pandas as pd
-    # import numpy as np
+    import numpy as np
     # from numpy.random import choice
     # other unsafe imports
 except ImportError:
-    logging.error("Missing pandas library")
+    logging.error("Missing pandas and/or numpy library")
     # raise ImportError("Missing pandas library")
     sys.exit()
 
@@ -137,17 +137,39 @@ def sample_multiple_days_processed_journey(
 
     filepath_list = glob.glob(
         f'{data_dir}/processed_journey/{filename_prefix}*.csv.gz')
+    logger.info(f"work with files {filepath_list}")
+
     total_occurrences_list = [
         get_df_total_occurrences(filepath) for filepath in filepath_list]
     total_occurrences = sum(total_occurrences_list)
+
+    if k > total_occurrences:
+        # raise a specific error as the required sample size is larger than the
+        # total occurrences, and will the maths and rounding work
+        # if k = total occurrences?
+        raise Error
+
+    logger.info(f"{total_occurrences} total occurrences in these files")
+
     k_list = np.array(total_occurrences_list) * k / total_occurrences
+    logger.debug(f"sample size from each file {k_list}")
 
     for filepath, k in zip(filepath_list, k_list):
         sample_one_day_processed_journey(
             data_dir, filepath, seed=seed, k=int(round(k)),
             with_replacement=with_replacement)
 
-    return
+    sampled_filepath_list = glob.glob(
+        f'{data_dir}/sampled_journey/{filename_prefix}*.csv.gz')
+
+    all_sample_df = pd.concat(
+        [pd.read_csv(f, sep="\t") for f in sampled_filepath_list])
+
+    out_path = os.path.join(data_dir, "sampled_journey",
+                            f"full_sample_{filename_prefix}.csv.gz")
+    all_sample_df.to_csv(out_path, sep="\t", compression="gzip", index=False)
+
+    return None
 
 
 # for each DF get total occurrences
