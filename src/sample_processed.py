@@ -25,9 +25,9 @@ REQUIRED_COLUMNS = ["Occurrences", "ABVariant", "Page_Event_List",
                     ]
 
 
-def get_df_total_occurrences(filepath):
-    df = pd.read_csv(filepath, sep="\t", usecols=["Occurrences"])
-    total_occurrences = df.Occurrences.sum()
+def get_df_total_occurrences_per_variant(filepath):
+    df = pd.read_csv(filepath, sep="\t", usecols=["Occurrences", "ABVariant"])
+    total_occurrences = df.groupby('ABVariant').sum()
     return total_occurrences
 
 
@@ -139,15 +139,19 @@ def sample_multiple_days_processed_journey(
         f'{data_dir}/processed_journey/{filename_prefix}*.csv.gz')
     logger.info(f"work with files {filepath_list}")
 
-    total_occurrences_list = [
-        get_df_total_occurrences(filepath) for filepath in filepath_list]
-    total_occurrences = sum(total_occurrences_list)
+    total_occurrences_df_list = [
+        get_df_total_occurrences_per_variant(filepath) for filepath in
+        filepath_list]
+    total_occurrences_df = pd.concat(
+        total_occurrences_df_list).groupby('ABVariant').sum()
 
-    if k > total_occurrences:
-        # raise a specific error as the required sample size is larger than the
-        # total occurrences, and will the maths and rounding work
-        # if k = total occurrences?
-        raise Error
+    for variant in ['A', 'B']:
+        total_occurrences = total_occurrences_df.at[variant, 'Occurrences']
+        if k > total_occurrences:
+            # raise a specific error as the required sample size is larger than the
+            # total occurrences, and will the maths and rounding work
+            # if k = total occurrences?
+            raise ValueError('sample size is greater than total occurrences')
 
     logger.info(f"{total_occurrences} total occurrences in these files")
 
