@@ -21,12 +21,16 @@ logging.debug("other modules loaded")
 # other cols we might want are:"Sequence", 'PageSequence', 'Event_List',
 # 'num_event_cats', "Event_cats_agg"
 REQUIRED_COLUMNS = ["Occurrences", "ABVariant", "Page_Event_List",
-                    "Page_List",  "Event_cat_act_agg"
-                    ]
+                    "Page_List",  "Event_cat_act_agg"]
+# use this when you want to group by everything that isn't Occurrences
+REQUIRED_COLUMNS_WITHOUT_OCC = [
+    "ABVariant", "Page_Event_List", "Page_List",  "Event_cat_act_agg"]
 
 
 def get_df_total_occurrences_per_variant(filepath):
+    logger.info(f"reading in occurrences from {filepath}")
     df = pd.read_csv(filepath, sep="\t", usecols=["Occurrences", "ABVariant"])
+    logger.info("getting total occurrences per variant for this file")
     total_occurrences = df.groupby('ABVariant').sum()
     return total_occurrences
 
@@ -66,27 +70,18 @@ def sample_one_file_processed_journey(
 
     # having issue with global env, $PWD not recognised in pycharm, so can't use DATA_DIR
     # assume current work dir is project dir
-    logger.info(f"Reading in file {filepath}")
-    df = pd.read_csv(filepath, sep='\t', usecols=REQUIRED_COLUMNS)
-
     filename = os.path.basename(filepath)
+    logger.info(f"Reading in file {filename}")
+    df = pd.read_csv(filepath, sep='\t', usecols=REQUIRED_COLUMNS)
     logger.debug(f'{filename} DataFrame shape {df.shape}')
 
     logger.info("Finished reading, now removing any non A or B variants")
-
     # filter out any weird values like Object object
     df["is_a_b"] = df["ABVariant"].map(is_a_b)
     df = df[df["is_a_b"]][REQUIRED_COLUMNS]
     logger.debug(f'Cleaned DataFrame shape {df.shape}')
 
     logger.info("Finished removing any non A or B variants, now sampling")
-
-    # size should be an arg, what is the desired sample size we are after?
-    # this will need to consider each day, and what day of the week it is
-    # so the user provides N, N is split into the appropriate proportions for each day
-    # as an mvp the user could provide a list of proportions for each filename
-    # or we could expect to get 7 filenames, and then hard code the sizes
-    # to abstract away this complexity
     # select rows at random
     a_df_sampled = df[df["ABVariant"] == 'A'].sample(
         n=a_k, replace=with_replacement, weights=df.Occurrences,
@@ -106,16 +101,15 @@ def sample_one_file_processed_journey(
     logger.debug(f'Overall sampled DataFrame shape {df_sampled.shape}')
 
     logger.info("rolling up data")
-    cols_without_occurrences = REQUIRED_COLUMNS.copy()
-    cols_without_occurrences.remove("Occurrences")
+
     df_sampled_grouped = df_sampled.groupby(
-        cols_without_occurrences).count().reset_index()
+        REQUIRED_COLUMNS_WITHOUT_OCC).count().reset_index()
 
     logger.debug(f'Sampled and rolled up DataFrame shape '
                  f'{df_sampled_grouped.shape}')
 
     logger.info(f"Saving to data/sampled_journey/{filename}")
-    out_path = os.path.join(data_dir, "sampled_journey", {filename})
+    out_path = os.path.join(data_dir, "sampled_journey", filename)
     df_sampled_grouped.to_csv(out_path, sep="\t", compression="gzip",
                               index=False)
 
@@ -126,6 +120,7 @@ def get_k_list_for_variant(k, variant, occurrences_df_list):
     logger.info(f"get k_list for variant {variant}")
     total_occurrences_list = [
         df.at[variant, 'Occurrences'] for df in occurrences_df_list]
+    total_occurrences_list = np.array(total_occurrences_list)
     total_occurrences = sum(total_occurrences_list)
     logger.info(f"{total_occurrences} total occurrences in these files")
     if k > total_occurrences:
@@ -134,7 +129,7 @@ def get_k_list_for_variant(k, variant, occurrences_df_list):
         # if k = total occurrences?
         raise ValueError('sample size is greater than total occurrences')
 
-    k_list = np.array(total_occurrences_list) * k / total_occurrences
+    k_list = total_occurrences_list * k / total_occurrences
     logger.debug(f"sample size from each file {k_list}")
     return k_list, total_occurrences_list
 
@@ -157,8 +152,8 @@ def sample_multiple_days_processed_journey(
        pandas.core.frame.DataFrame: A sampled data frame.
     """
 
-    filepath_list = glob.glob(
-        f'{data_dir}/processed_journey/{filename_prefix}*.csv.gz')
+    filepath_list = sorted(glob.glob(
+        f'{data_dir}/processed_journey/{filename_prefix}*.csv.gz'))
 
     logger.info(f"work with files {filepath_list}")
 
@@ -184,10 +179,15 @@ def sample_multiple_days_processed_journey(
     all_sample_df = pd.concat(
         [pd.read_csv(f, sep="\t") for f in sampled_filepath_list])
 
+    logger.info("rolling up all sample DataFrame")
+    grouped_all_sample_df = all_sample_df.groupby(
+        REQUIRED_COLUMNS_WITHOUT_OCC).sum().reset_index()
+
     out_path = os.path.join(data_dir, "sampled_journey",
                             f"full_sample_{filename_prefix}.csv.gz")
     logger.info(f"Saving overall sample to {out_path}")
-    all_sample_df.to_csv(out_path, sep="\t", compression="gzip", index=False)
+    grouped_all_sample_df.to_csv(
+        out_path, sep="\t", compression="gzip", index=False)
 
     return None
 
@@ -203,28 +203,33 @@ def sample_multiple_days_processed_journey(
 
 if __name__ == "__main__":  # our module is being executed as a program
     parser = argparse.ArgumentParser(
-        description='Sampling processed for A/B test data module',
+        description='Module for sampling processed data for an A/B test',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         'filename_prefix', help='''
-        File prefix of fiels we want to sample. We will read from the 
-        processed_journey directory in data, and write to the sampled_journey 
-        directory
+        Prefix of files we want to sample. We will read from the 
+        processed_journey directory from the DATA_DIR specified in you .envrc, 
+        and write to the sampled_journey directory in DATA_DIR, the overall 
+        sample will be saved as full_sample_<<filename_prefix>>.csv.gz
         ''')
     parser.add_argument(
-        '--seed', help='seed for choosing sample', default=1337, type=int)
+        '--seed', help='''
+        Seed for the random number generator for pandas.DataFrame.sample
+        ''', default=1337, type=int)
     parser.add_argument(
-        '--k', help='number of journeys per variant you want in your sampled '
-                    'dataframe',
-        default=1000, type=int)
+        '--k', help='''
+        number of journeys per variant you want in your sampled DataFrame
+        ''', default=1000, type=int)
 
     # should we give people the opportunity to sample without replacement?
     parser.add_argument(
-        '--with_replacement', default=True,
-        help='do you want to sample with or without replacement?', type=bool)
-    parser.add_argument('--debug-level', default="INFO",
-                        help='debug level of messages (DEBUG, INFO, WARNING'
-                             ' etc...)')
+        '--with_replacement',
+        help='do you want to sample with or without replacement?',
+        default=True, type=bool)
+    parser.add_argument(
+        '--debug-level',
+        help='debug level of messages (DEBUG, INFO, WARNING, etc...)',
+        default="INFO")
     args = parser.parse_args()
 
     # Logger setup
@@ -234,12 +239,9 @@ if __name__ == "__main__":  # our module is being executed as a program
     logger.setLevel(getattr(logging, args.debug_level))
 
     DATA_DIR = os.getenv("DATA_DIR")
-    logger.debug("data directory" + DATA_DIR)
-
-    print()
+    logger.debug(f"data directory {DATA_DIR}")
     logger.debug(f"Args: seed={args.seed}, k={args.k}, "
                  f"with_replacement={args.with_replacement}")
     sample_multiple_days_processed_journey(
         DATA_DIR, args.filename_prefix, seed=args.seed, k=args.k,
         with_replacement=args.with_replacement)
-    # main(sys.argv[1])  # The 0th arg is the module filename
