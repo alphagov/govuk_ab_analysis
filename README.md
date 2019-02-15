@@ -20,7 +20,7 @@ positional arguments:
                         specified in you .envrc, and write to the
                         sampled_journey directory in DATA_DIR, the overall
                         sample will be saved as
-                        full_sample_<<filename_prefix>>.csv.gz
+                        full_sample_<<filename_prefix>>_<<k>>.csv.gz
 optional arguments:
   -h, --help            show this help message and exit
   --seed SEED           Seed for the random number generator for
@@ -53,5 +53,8 @@ power analysis (see `z_prop_test_power_analysis.Rmd`). And we've set the debug l
 we can see what's going in more detail.
 
 The output will be: samples for each file, saved under their names but in the `sampled_journey` directory in DATA_DIR, 
-and a combined file with the overall sample, saved as `full_sample_taxon_ab_2019.csv.gz` in `sampled_journey`.
+and a combined file with the overall sample, saved as `full_sample_taxon_ab_2019_947858.csv.gz` in `sampled_journey`.
+
+Some rounding may result in a very small amount more or less than the k value being included in the final sample, so 
+ideally specify a k a few journeys higher than the k you require.
                            

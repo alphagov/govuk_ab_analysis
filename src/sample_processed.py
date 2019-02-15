@@ -184,7 +184,7 @@ def sample_multiple_days_processed_journey(
         REQUIRED_COLUMNS_WITHOUT_OCC).sum().reset_index()
 
     out_path = os.path.join(data_dir, "sampled_journey",
-                            f"full_sample_{filename_prefix}.csv.gz")
+                            f"full_sample_{filename_prefix}_{k}.csv.gz")
     logger.info(f"Saving overall sample to {out_path}")
     grouped_all_sample_df.to_csv(
         out_path, sep="\t", compression="gzip", index=False)
@@ -210,7 +210,7 @@ if __name__ == "__main__":  # our module is being executed as a program
         Prefix of files we want to sample. We will read from the 
         processed_journey directory from the DATA_DIR specified in you .envrc, 
         and write to the sampled_journey directory in DATA_DIR, the overall 
-        sample will be saved as full_sample_<<filename_prefix>>.csv.gz
+        sample will be saved as full_sample_<<filename_prefix>>_<<k>>.csv.gz
         ''')
     parser.add_argument(
         '--seed', help='''
