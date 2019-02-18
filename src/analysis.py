@@ -272,10 +272,36 @@ def analyse_sampled_processed_journey(data_dir, filename):
 
     logger.info('All necessary variables derived for pending statistical tests...')
 
+    logger.debug('Performing z_prop test on prop with at least one related link.')
+
     rl_stats = z_prop(df, 'Has_Related')
     # as it's one row needs to be a Series
     df_ab = pd.Series(rl_stats).to_frame().T
     logger.debug(df_ab)
+    ci_low, ci_upp = zconf_interval_two_samples(rl_stats['x_a'], rl_stats['n_a'],
+                                                rl_stats['x_b'], rl_stats['n_b'], alpha=0.01)
+    logger.debug(' 95% Confidence Interval = ( {0:.2f}% , {1:.2f}% )'
+                 .format(100 * ci_low, 100 * ci_upp))
+    df_ab['ci_low'] = ci_low
+    df_ab['ci_upp'] = ci_upp
+
+    logger.debug('Performing z_prop test on prop with content page nav event.')
+
+    nav_stats = z_prop(df, 'Content_Page_Nav_Event_Count')
+    # concat rows
+    df_ab_nav = pd.Series(nav_stats).to_frame().T
+    logger.debug(df_ab_nav)
+    ci_low, ci_upp = zconf_interval_two_samples(nav_stats['x_a'], nav_stats['n_a'],
+                                                nav_stats['x_b'], nav_stats['n_b'], alpha=0.01)
+    logger.debug(' 95% Confidence Interval = ( {0:.2f}% , {1:.2f}% )'
+                 .format(100 * ci_low, 100 * ci_upp))
+    # assign a dict to row of dataframe
+    df_ab_nav['ci_low'] = ci_low
+    df_ab_nav['ci_upp'] = ci_upp
+
+    logger.debug('Joining dataframes.')
+
+    df_ab = pd.concat([df_ab, df_ab_nav])
 
     logger.info('Saving df with related links derived variables to rl_sampled_processed_journey dir')
     out_path = os.path.join(DATA_DIR, "rl_sampled_processed_journey", f"{filename}")
