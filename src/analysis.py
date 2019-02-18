@@ -106,6 +106,72 @@ def count_search_from_content(page_list):
     return search_from_content
 
 
+def z_prop(df, col_name):
+    """
+    Conduct z_prop test and generate confidence interval.
+
+    Using Bernoulli trial terminology where X (or x)
+    is number of successes and n is number of trials
+    total occurrences, we compare ABVariant A and B.
+    p is x/n. We use a z proportion test between variants.
+    """
+    # A & B
+    n = df.Occurrences.sum()
+    # prop of journeys with at least one related link, occurrences summed for those rows gives X
+    p = df[df[col_name] == 1].Occurrences.sum() / n
+
+    assert (p >= 0), "Prop less than zero!"
+    assert (p <= 1), "Prop greater than one!"
+
+    # A
+    # number of trials for page A
+    n_a = df[df.ABVariant == "A"].Occurrences.sum()
+    # number of successes (occurrences), for page A and at least one related link clicked journeys
+    x_a = df[(df['ABVariant'] == 'A') & (df[col_name] == 1)].Occurrences.sum()
+    # prop of journeys where one related link was clicked, on A
+    p_a = x_a / n_a
+
+    # B
+    # number of trials for page B
+    n_b = df[df.ABVariant == "B"].Occurrences.sum()
+    # number of successes for page B, at least one related link clicked
+    x_b = df[(df['ABVariant'] == 'B') & (df[col_name] == 1)].Occurrences.sum()
+    # prop of journeys where one related link was clicked, on B
+    p_b = x_b / n_b
+
+    assert (n == n_a + n_b), "Error in filtering by ABVariant!"
+
+    # validate assumptions
+    # The formula of z-statistic is valid only when sample size (n) is large enough.
+    # nAp, nAq, nBp and nBq should be ≥ 5.
+    # where p is probability of success (we can use current baseline)
+    # q = 1 - p
+
+    # tried a helper function here but it didn't work hence not DRY
+    assert (n_a * p) >= 5, "Assumptions for z prop test invalid!"
+    assert (n_a * (1 - p)) >= 5, "Assumptions for z prop test invalid!"
+
+    assert (n_b * p) >= 5, "Assumptions for z prop test invalid!"
+    assert (n_b * (1 - p)) >= 5, "Assumptions for z prop test invalid!"
+
+    # using statsmodels
+    # successes
+    count = np.array([x_a, x_b])
+    # number of trials
+    nobs = np.array([n_a, n_b])
+    # z prop test
+    z, p_value = proportions_ztest(count, nobs, value=0, alternative='two-sided')
+    # print(' z-stat = {z} \n p-value = {p_value}'.format(z=z,p_value=p_value))
+
+    statsdict = {'metric_name': col_name, 'stats_method': 'z_prop_test',
+                 'x_ab': x_a + x_b, 'n_ab': n, 'p': p,
+                 'x_a': x_a, 'n_a': n_a, 'p_a': p_a,
+                 'x_b': x_b, 'n_b': n_b, 'p_b': p_b,
+                 'test_statistic': z, 'p-value': p_value}
+
+    return statsdict
+
+
 def compute_standard_error_prop_two_samples(x_a, n_a, x_b, n_b):
     """
     The standard error of the difference between two proportions is given by the square root of the variances.
@@ -113,8 +179,8 @@ def compute_standard_error_prop_two_samples(x_a, n_a, x_b, n_b):
     The square of the standard error of a proportion is known as the variance of proportion.
     The variance of the difference between two independent proportions is equal to the sum of the variances of the proportions of each sample.
     The variances are summed because each sample contributes to sampling error in the distribution of differences.
-
     """
+
     p1 = x_a / n_a
     p2 = x_b / n_b
     se = p1 * (1 - p1) / n_a + p2 * (1 - p2) / n_b
@@ -143,6 +209,11 @@ def analyse_sampled_processed_journey(data_dir, filename):
         Conducts various A/B tests on one sampled processed journey file.
 
         This function is dependent on document_types.csv.gz existing in data/metadata dir.
+
+        As this takes some time to run ~ 1 hour, we output an additional dataframe as .csv.gz
+        to the rl_sampled_processed dir as a side effect.
+        This can allow the user to revisit the metrics
+        at a later date without having to rerun the analysis.
 
         Parameters:
             data_dir: The directory processed_journey and sampled_journey can be
@@ -201,20 +272,15 @@ def analyse_sampled_processed_journey(data_dir, filename):
 
     logger.info('All necessary variables derived for pending statistical tests...')
 
-    df_ab = pd.DataFrame(columns=['metric_name', 'stats_method',
-                             'x_ab', 'n_ab', 'p_ab',
-                             'x_a', 'n_a', 'p_a',
-                             'x_b', 'n_b', 'p_b',
-                             'test_statistic', 'uci_dif', 'lci_dif',
-                             'alpha', 'h0_status', 'relative_uplift'])
+    rl_stats = z_prop(df, 'Has_Related')
+    # as it's one row needs to be a Series
+    df_ab = pd.Series(rl_stats).to_frame().T
+    logger.debug(df_ab)
 
-    logger.info(df_ab)
-
-    logger.info('Saving csv to reports dir')
-
-    out_path = os.path.join(REPORTS_DIR, f"{filename}")
+    logger.info('Saving df with related links derived variables to rl_sampled_processed_journey dir')
+    out_path = os.path.join(DATA_DIR, "rl_sampled_processed_journey", f"{filename}")
     logger.info(f"Saving to {out_path}")
-    df_ab.to_csv(out_path, sep="\t", compression="gzip", index=False)
+    df_ab.to_csv(out_path, compression="gzip", index=False)
 
     return None
 
