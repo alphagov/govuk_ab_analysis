@@ -1,2 +1,12 @@
 numpy
 pandas
+
+# for analysis notebook
+jupyter
+statsmodels
+matplotlib
+scipy
+seaborn
+bayesian_bootstrap
+astropy
+tqdm

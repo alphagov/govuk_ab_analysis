@@ -57,4 +57,11 @@ and a combined file with the overall sample, saved as `full_sample_taxon_ab_2019
 
 Some rounding may result in a very small amount more or less than the k value being included in the final sample, so 
 ideally specify a k a few journeys higher than the k you require.
-                           
+
+### Finding vs thing pages
+
+`notebooks/document_type_query.ipynb` is a notebook with a query to work out from page document types whether those
+pages are "finding" pages or "thing" pages, as detailed [here](https://docs.publishing.service.gov.uk/document-types/user_journey_document_supertype.html).
+Rerun this query for the period you want to analyse an A/B test for to get information for all pages visited in that
+period. The output file is then used to calculate our metrics.
+                          
