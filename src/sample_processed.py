@@ -35,15 +35,6 @@ def get_df_total_occurrences_per_variant(filepath):
     return total_occurrences
 
 
-def is_a_b(variant):
-    """
-    Is the value of the variant either 'A' or 'B'? Filters out junk data
-    :param variant:
-    :return: True or False
-    """
-    return any([variant == x for x in ['A', 'B']])
-
-
 def sample_one_file_processed_journey(
         data_dir, filepath, seed=1337, a_k=500, b_k=500,
         with_replacement=True):
@@ -76,20 +67,19 @@ def sample_one_file_processed_journey(
     logger.debug(f'{filename} DataFrame shape {df.shape}')
 
     logger.info("Finished reading, now removing any non A or B variants")
-    # filter out any weird values like Object object
-    df["is_a_b"] = df["ABVariant"].map(is_a_b)
-    df = df[df["is_a_b"]][REQUIRED_COLUMNS]
-    logger.debug(f'Cleaned DataFrame shape {df.shape}')
+    # filter out any weird values like Object object, select useful cols
+    clean_thin_df = df.query("ABVariant in ['A', 'B']")[REQUIRED_COLUMNS]
+    logger.debug(f'Cleaned DataFrame shape {clean_thin_df.shape}')
 
     logger.info("Finished removing any non A or B variants, now sampling")
     # select rows at random
-    a_df_sampled = df[df["ABVariant"] == 'A'].sample(
-        n=a_k, replace=with_replacement, weights=df.Occurrences,
+    a_df_sampled = clean_thin_df[clean_thin_df["ABVariant"] == 'A'].sample(
+        n=a_k, replace=with_replacement, weights=clean_thin_df.Occurrences,
         random_state=seed)
     logger.debug(f'Sampled A variant DataFrame shape {a_df_sampled.shape}')
 
-    b_df_sampled = df[df["ABVariant"] == 'B'].sample(
-        n=b_k, replace=with_replacement, weights=df.Occurrences,
+    b_df_sampled = clean_thin_df[clean_thin_df["ABVariant"] == 'B'].sample(
+        n=b_k, replace=with_replacement, weights=clean_thin_df.Occurrences,
         random_state=seed)
     logger.debug(f'Sampled B variant DataFrame shape {b_df_sampled.shape}')
 
@@ -113,10 +103,20 @@ def sample_one_file_processed_journey(
     df_sampled_grouped.to_csv(out_path, sep="\t", compression="gzip",
                               index=False)
 
-    return None
-
 
 def get_k_list_for_variant(k, variant, occurrences_df_list):
+    """
+    Get a list of floats, how many journeys we should take from each
+        file to get a proportional sample for this variant
+    :param int k: total number of occurrences we want for the variant
+    :param str variant: the variant we want to look at, e.g. 'A', 'B'
+    :param list occurrences_df_list: list of pandas DataFrames
+    :return: (k_list, total_occurrences_list) -
+        k_list is a list of floats, how many journeys we should take from each
+        file to get a proportional sample for this variant
+        total_occurrences_list is a list of the total number of occurrences
+        for this variant per file
+    """
     logger.info(f"get k_list for variant {variant}")
     total_occurrences_list = [
         df.at[variant, 'Occurrences'] for df in occurrences_df_list]
@@ -139,17 +139,25 @@ def sample_multiple_days_processed_journey(
     """
     Samples from multiple processed journey files, to get one proportional
     sample of k journeys, saved in one file in the sampled_journey directory.
+    First it samples each file beginning with filename_prefix in
+    data_dir/processed_journey, then saves that file's sample in
+    data_dir/sampled_journey, then takes all the files beginning with
+    filename_prefix in data_dir/sampled_journey and combines them to get one
+    sample file. Make sure there aren't any rogue files in
+    data_dir/sampled_journey when you start!
 
     Parameters:
         data_dir: The directory processed_journey and sampled_journey can be
             found in
-        filename_prefix (str): The filename of the processed journey.
+        filename_prefix (str): The filename prefix of the processed journeys,
+            we will sample from all the days that start with this file prefix
+            and end with .csv.gz that are found in data_dir/processed_journey.
         seed (int): The random seed for reproducibility.
         k (int): The number of journeys in the sample for each variant.
         with_replacement (bool): Whether the sample is with or without replacement.
 
     Returns:
-       pandas.core.frame.DataFrame: A sampled data frame.
+       None
     """
 
     filepath_list = sorted(glob.glob(
@@ -188,8 +196,6 @@ def sample_multiple_days_processed_journey(
     logger.info(f"Saving overall sample to {out_path}")
     grouped_all_sample_df.to_csv(
         out_path, sep="\t", compression="gzip", index=False)
-
-    return None
 
 
 # for each DF get total occurrences
