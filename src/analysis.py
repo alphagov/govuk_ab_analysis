@@ -1,11 +1,9 @@
 import os
 import sys
 import argparse
-import glob
 import pandas as pd
 import numpy as np
 import ast
-import re
 import logging.config
 # .. other safe imports
 try:
@@ -203,6 +201,74 @@ def zconf_interval_two_samples(x_a, n_a, x_b, n_b, alpha=0.05):
     return p2 - p1 - z_critical * se, p2 - p1 + z_critical * se
 
 
+def bayesian_bootstrap_analysis(df, col_name=None, boot_reps=4000, seed=1337):
+    """Run bayesian bootstrap on the mean of a variable of interest between Page Variants.
+
+    Args:
+        df: A rl_sampled_processed pandas Datframe.
+        col_name: A string of the column of interest.
+        boot_reps: An int for the number of times to resample.
+        seed: for reproducibility.
+
+    Returns:
+        a_bootstrap: a vector of boot_reps n resampled means from A.
+        b_bootstrap: a vector of boot_reps n resampled means from B.
+        """
+    # need to roll out the data, to resample from, deaggregate on one variable of interest
+    # we want to repeat each row's journey length by it's occurrences
+    # so more common journey lengths are more likely to be sampled
+    a_r = np.repeat(df.loc[df.ABVariant == "A", col_name], df.loc[df.ABVariant == "A", "Occurrences"])
+    b_r = np.repeat(df.loc[df.ABVariant == "B", col_name], df.loc[df.ABVariant == "B", "Occurrences"])
+    # for reproducibility, set the seed within this context
+    with NumpyRNGContext(seed):
+        a_bootstrap = bb.mean(a_r.values, n_replications=boot_reps)
+        b_bootstrap = bb.mean(b_r.values, n_replications=boot_reps)
+
+        return a_bootstrap, b_bootstrap
+
+
+def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
+    """Calculate a 1-alpha high density interval
+
+    Args:
+        a_bootstrap: a list of resampled means from page A journeys.
+        b_bootstrap: a list of resampled means from page B journeys.
+        alpha: false positive rate.
+
+    Returns:
+        a_ci_low: the lower point of the 1-alpha% highest density interval for A.
+        a_ci_hi: the higher point of the 1-alpha% highest density interval for A.
+        b_ci_low: the lower point of the 1-alpha% highest density interval for B.
+        b_ci_hi: the higher point of the 1-alpha% highest density interval for B.
+        ypa_diff_mean: the mean difference for the posterior between A's and B's distributions.
+        ypa_diff_ci_low: lower hdi for posterior of the difference.
+        ypa_diff_ci_hi: upper hdi for posterior of the difference.
+        sorta_p_value: number of values greater than 0 divided by num of obs for mean diff psoterior.
+        """
+    # Calculate a 95% HDI
+    a_ci_low, a_ci_hi = bb.highest_density_interval(a_bootstrap, alpha=alpha)
+    # Calculate a 95% HDI
+    b_ci_low, b_ci_hi = bb.highest_density_interval(b_bootstrap, alpha=alpha)
+
+    # calculate the posterior for the difference between A's and B's mean of resampled means
+    # ypa prefix is vestigial from blog post
+    ypa_diff = np.array(b_bootstrap) - np.array(a_bootstrap)
+    ypa_diff_mean = ypa_diff.mean()
+    # get the hdi
+    ypa_diff_ci_low, ypa_diff_ci_hi = bb.highest_density_interval(ypa_diff)
+    # We count the number of values greater than 0 and divide by the total number
+    # of observations
+    # which returns us the the proportion of values in the distribution that are
+    # greater than 0, could act a bit like a p-value
+    p_value = (ypa_diff > 0).sum() / ypa_diff.shape[0]
+
+    return {'a_ci_low': a_ci_low, 'a_ci_hi': a_ci_hi,
+            'b_ci_low': b_ci_low, 'b_ci_hi': b_ci_hi,
+            'ypa_diff_mean': ypa_diff_mean,
+            'ypa_diff_ci_low': ypa_diff_ci_low, 'ypa_diff_ci_hi': ypa_diff_ci_hi,
+            'p_value': p_value}
+
+
 # main
 def analyse_sampled_processed_journey(data_dir, filename):
     """
@@ -299,14 +365,41 @@ def analyse_sampled_processed_journey(data_dir, filename):
     df_ab_nav['ci_low'] = ci_low
     df_ab_nav['ci_upp'] = ci_upp
 
-    logger.debug('Joining dataframes.')
+    logger.debug('Joining z_prop dataframes.')
 
     df_ab = pd.concat([df_ab, df_ab_nav])
 
     logger.info('Saving df with related links derived variables to rl_sampled_processed_journey dir')
-    out_path = os.path.join(DATA_DIR, "rl_sampled_processed_journey", f"{filename}")
+    out_path = os.path.join(DATA_DIR, "rl_sampled_processed_journey", ("zprop_" + f"{filename}"))
     logger.info(f"Saving to {out_path}")
     df_ab.to_csv(out_path, compression="gzip", index=False)
+
+    logger.info('Performing Bayesian bootstrap on Ratio of nav search to related links.')
+
+    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Ratio_Nav_Search_to_Rel')
+    # high density interval of page variants and difference posteriors
+    ratio_nav_stats = bb_hdi(a_bootstrap, b_bootstrap)
+
+    df_ab_ratio = pd.Series(ratio_nav_stats).to_frame().T
+    logger.debug(df_ab_ratio)
+
+    logger.info('Performing Bayesian bootstrap on Page_List_Length')
+
+    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Page_List_Length')
+    # high density interval of page variants and difference posteriors
+    length_stats = bb_hdi(a_bootstrap, b_bootstrap)
+
+    df_ab_length = pd.Series(length_stats).to_frame().T
+    logger.debug(df_ab_length)
+
+    logger.debug('Joining bayesian boot dataframes.')
+
+    df_bayes = pd.concat([df_ab_ratio, df_ab_length])
+
+    logger.info('Saving df with related links derived variables to rl_sampled_processed_journey dir')
+    out_path = os.path.join(DATA_DIR, "rl_sampled_processed_journey", ("bayesbootstrap_" + f"{filename}"))
+    logger.info(f"Saving to {out_path}")
+    df_bayes.to_csv(out_path, compression="gzip", index=False)
 
     return None
 
