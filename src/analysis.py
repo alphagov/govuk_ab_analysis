@@ -336,13 +336,19 @@ def analyse_sampled_processed_journey(data_dir, filename):
     df['Content_Page_Nav_Event_Count'] = df['Page_Event_List'].progress_map(count_nav_events)
     logger.info('Search events preparation...')
     df['Content_Search_Event_Count'] = df['Page_List'].progress_map(count_search_from_content)
+    logger.debug('Summing Nav and Search Events')
+    df['Content_Nav_or_Search_Count'] = df['Content_Page_Nav_Event_Count'] + df['Content_Search_Event_Count']
+
     logger.debug('Sum content page nav event and search events, then multiply by occurrences for row total.')
-    df['Content_Nav_Search_Event_Sum_row_total'] = (df['Content_Page_Nav_Event_Count'] +
-                                                    df['Content_Search_Event_Count']) * df['Occurrences']
+    df['Content_Nav_Search_Event_Sum_row_total'] = df['Content_Nav_or_Search_Count'] * df['Occurrences']
     logger.debug('Calculating the ratio of clicks on navigation elements vs. clicks on related links')
     # avoid NaN with +1
     df['Ratio_Nav_Search_to_Rel'] = (df['Content_Nav_Search_Event_Sum_row_total'] + 1) / \
                                     (df['Related Links Clicks row total'] + 1)
+
+    # if (Content_Nav_Search_Event_Sum == 0) that's our success
+    # Has_No_Nav_Or_Search will equal 1, that's our success, works with z_prop function
+    df['Has_No_Nav_Or_Search'] = df['Content_Nav_Search_Event_Sum_row_total'] == 0
 
     logger.info('All necessary variables derived for pending statistical tests...')
 
@@ -361,7 +367,7 @@ def analyse_sampled_processed_journey(data_dir, filename):
 
     logger.debug('Performing z_prop test on prop with content page nav event.')
 
-    nav_stats = z_prop(df, 'Content_Page_Nav_Event_Count')
+    nav_stats = z_prop(df, 'Has_No_Nav_Or_Search')
     # concat rows
     df_ab_nav = pd.Series(nav_stats).to_frame().T
     logger.debug(df_ab_nav)
