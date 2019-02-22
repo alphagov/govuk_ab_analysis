@@ -64,9 +64,8 @@ def is_related(x):
 
 def is_nav_event(event):
     """
-    Return the total number of related links clicks for that row.
+    Determine whether an event is navigation related.
 
-    Clicks per sequence multiplied by occurrences.
     """
     return any(
         ['breadcrumbClicked' in event, 'homeLinkClicked' in event,
@@ -91,7 +90,8 @@ def count_nav_events(page_event_list):
 
 def count_search_from_content(page_list):
     """
-    Counts the number of GOV.UK searches in the given journey.
+    Counts the number of GOV.UK searches from a content page,
+     as specified by the list of content pages, `thing_page_paths`.
 
     Helper function dependent on thing_page_paths instantiated in analyse_sampled_processed_journey.
     """
@@ -172,11 +172,14 @@ def z_prop(df, col_name):
 
 def compute_standard_error_prop_two_samples(x_a, n_a, x_b, n_b):
     """
-    The standard error of the difference between two proportions is given by the square root of the variances.
+    The standard error of the difference between two proportions
+     is given by the square root of the sum of the variances.
 
-    The square of the standard error of a proportion is known as the variance of proportion.
-    The variance of the difference between two independent proportions is equal to the sum of the variances of the proportions of each sample.
-    The variances are summed because each sample contributes to sampling error in the distribution of differences.
+     The variance of the difference between two independent proportions is
+      equal to the sum of the variances of the proportions of each sample,
+       because each sample contributes to sampling error in the distribution of differences.
+        var(A-B) = var(A) + ((-1)^2)*var(B)
+
     """
 
     p1 = x_a / n_a
@@ -190,7 +193,8 @@ def zconf_interval_two_samples(x_a, n_a, x_b, n_b, alpha=0.05):
     Gives two points, the lower and upper bound of a (1-alpha)% confidence interval.
 
     To calculate the confidence interval we need to know the standard error of the difference between two proportions.
-    The standard error of the difference between two proportions is the combination of the standard error of two independent distributions, ES (p_a) and (p_b).
+    The standard error of the difference between two proportions is the combination of the standard error
+     of two independent distributions, ES (p_a) and (p_b).
 
     If the CI includes one then we accept the null hypothesis at the defined alpha.
     """
@@ -243,7 +247,8 @@ def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
         ypa_diff_mean: the mean difference for the posterior between A's and B's distributions.
         ypa_diff_ci_low: lower hdi for posterior of the difference.
         ypa_diff_ci_hi: upper hdi for posterior of the difference.
-        sorta_p_value: number of values greater than 0 divided by num of obs for mean diff psoterior.
+        prob_b_>_a: number of values greater than 0 divided by num of obs for mean diff posterior. Or
+        the probability that B's mean metric was greater than A's mean metric.
         """
     # Calculate a 95% HDI
     a_ci_low, a_ci_hi = bb.highest_density_interval(a_bootstrap, alpha=alpha)
@@ -259,14 +264,14 @@ def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
     # We count the number of values greater than 0 and divide by the total number
     # of observations
     # which returns us the the proportion of values in the distribution that are
-    # greater than 0, could act a bit like a p-value
+    # greater than 0
     p_value = (ypa_diff > 0).sum() / ypa_diff.shape[0]
 
     return {'a_ci_low': a_ci_low, 'a_ci_hi': a_ci_hi,
             'b_ci_low': b_ci_low, 'b_ci_hi': b_ci_hi,
-            'ypa_diff_mean': ypa_diff_mean,
-            'ypa_diff_ci_low': ypa_diff_ci_low, 'ypa_diff_ci_hi': ypa_diff_ci_hi,
-            'p_value': p_value}
+            'diff_mean': ypa_diff_mean,
+            'diff_ci_low': ypa_diff_ci_low, 'diff_ci_hi': ypa_diff_ci_hi,
+            'prob_b_>_a': p_value}
 
 
 # main
@@ -303,9 +308,8 @@ def analyse_sampled_processed_journey(data_dir, filename):
                 " in-case the user did not sample...")
 
     # filter out any weird values like Object object
-    df["is_a_b"] = df["ABVariant"].map(is_a_b)
-    # drop helper column
-    df = df[df["is_a_b"]][REQUIRED_COLUMNS]
+    df.query("ABVariant in ['A', 'B']", inplace=True)
+
     logger.debug(f'Cleaned DataFrame shape {df.shape}')
 
     logger.info('Preparing variables / cols for analysis...')
@@ -332,9 +336,13 @@ def analyse_sampled_processed_journey(data_dir, filename):
     df['Content_Page_Nav_Event_Count'] = df['Page_Event_List'].progress_map(count_nav_events)
     logger.info('Search events preparation...')
     df['Content_Search_Event_Count'] = df['Page_List'].progress_map(count_search_from_content)
+    logger.debug('Sum content page nav event and search events, then multiply by occurrences for row total.')
+    df['Content_Nav_Search_Event_Sum_row_total'] = (df['Content_Page_Nav_Event_Count'] +
+                                                    df['Content_Search_Event_Count']) * df['Occurrences']
     logger.debug('Calculating the ratio of clicks on navigation elements vs. clicks on related links')
-    df['Ratio_Nav_Search_to_Rel'] = (df['Content_Page_Nav_Event_Count'] + df.Content_Search_Event_Count + 1) / (
-                df['Related Links Clicks row total'] + 1)
+    # avoid NaN with +1
+    df['Ratio_Nav_Search_to_Rel'] = (df['Content_Nav_Search_Event_Sum_row_total'] + 1) / \
+                                    (df['Related Links Clicks row total'] + 1)
 
     logger.info('All necessary variables derived for pending statistical tests...')
 
@@ -395,13 +403,15 @@ def analyse_sampled_processed_journey(data_dir, filename):
     logger.debug('Joining bayesian boot dataframes.')
 
     df_bayes = pd.concat([df_ab_ratio, df_ab_length])
+    # modifies in place
+    df_bayes.insert(0, 'Metric', ['Ratio_Nav_Search_to_Rel', 'Page_List_Length'])
 
     logger.info('Saving df with related links derived variables to rl_sampled_processed_journey dir')
     out_path = os.path.join(DATA_DIR, "rl_sampled_processed_journey", ("bayesbootstrap_" + f"{filename}"))
     logger.info(f"Saving to {out_path}")
     df_bayes.to_csv(out_path, compression="gzip", index=False)
 
-    return None
+    return
 
 
 if __name__ == "__main__":  # our module is being executed as a program
@@ -447,5 +457,4 @@ if __name__ == "__main__":  # our module is being executed as a program
     finding_page_paths = df_finding_thing[
         df_finding_thing['is_finding'] == 1]['pagePath'].tolist()
 
-    print()
     analyse_sampled_processed_journey(DATA_DIR, args.filename)
