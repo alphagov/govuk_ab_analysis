@@ -425,10 +425,13 @@ if __name__ == "__main__":  # our module is being executed as a program
         description='Analysing sampled processed data module')
     parser.add_argument(
         'filename', help='''
-        Name of the sampled file we want to analyse 
-        without .csv.gz suffix. We will read from the 
-        sampled_journey directory in data, and write to the reports 
-        directory.
+        Prefix of files we want to analyse without csv.gz ending. We will read from
+                        the sampled_journey directory from the DATA_DIR
+                        specified in your .envrc, and write to the
+                        rl_sampled_processed_journey directory in DATA_DIR, the two dataframes with analyses outputs, 
+                        will be saved as
+                        bayesbootstrap_<<filename_prefix>>.csv.gz and
+                         zprop_<<filename_prefix>>.csv.gz
         ''')
     parser.add_argument('--debug-level', default="INFO",
                         help='debug level of messages (DEBUG, INFO, WARNING'
