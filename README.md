@@ -16,6 +16,15 @@ An analytical pipeline for analysing A/B test data output from this
 to work out from page document types whether those pages are "finding" pages or "thing" pages. 
 See `notebooks/document_type_query.ipynb` for details.
 
+### Metadata required for analysis
+Some of the metrics used in our analysis are derived from the types of pages that users visit;
+ is a page a "finding" or a "thing"? Users need a contemporary lookup table to determine this.
+`notebooks/document_type_query.ipynb` is a notebook with a query to work out from page document types whether those
+pages are "finding" pages or "thing" pages,
+ as detailed [here](https://docs.publishing.service.gov.uk/document-types/user_journey_document_supertype.html).
+Rerun this query for the period you want to analyse an A/B test for to get information for all pages visited in that
+period. The output file is then used to calculate our metrics. This file should be placed into `./data/metadata`.
+
 ## Preparing your python environment
 
 The Makefile assumes that the `python3` command is pointing to the correct distribution of python,
@@ -123,7 +132,9 @@ Our processed and sampled journey data from `sample_processed.py`, following the
  `full_sample_taxon_ab_2019_947858.csv.gz` in `sampled_journey` in `DATA_DIR`.
 #### Using the notebook
 You can open the `generate_ab_rl_mvp.ipynb` notebook and adjust the `filename` therein,
- to `full_sample_taxon_ab_2019_947858.csv.gz`.
+ to `full_sample_taxon_ab_2019_947858.csv.gz`. The bootstrap reps is set to a standard 10,000 and alpha is 
+ set to 0.01 after the Bon Ferroni correction of alpha / number of tests
+  (alpha ~ 0.05 for the related links experiments).
 
 #### Running the analysis module programmatically
 In the console run the script and pass it the `filename` of the processed sampled dataframe found in the `sampled_journey` directory in DATA_DIR. 
