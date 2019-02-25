@@ -9,29 +9,17 @@ An analytical pipeline for analysing A/B test data output from this
     This outputs the knowledge to inform a decision whether there was a difference between page variants A and B.
 
 ## Requirements
-
 * Python 3.7
 * See [base-requirements.txt](base-requirements.txt) for python dependencies.
 * `document_types.csv.gz` in the `DATA_DIR/metadata` dir - essentially a lookup table, 
 to work out from page document types whether those pages are "finding" pages or "thing" pages. 
 See `notebooks/document_type_query.ipynb` for details.
 
-### Metadata required for analysis
-Some of the metrics used in our analysis are derived from the types of pages that users visit;
- is a page a "finding" or a "thing"? Users need a contemporary lookup table to determine this.
-`notebooks/document_type_query.ipynb` is a notebook with a query to work out from page document types whether those
-pages are "finding" pages or "thing" pages,
- as detailed [here](https://docs.publishing.service.gov.uk/document-types/user_journey_document_supertype.html).
-Rerun this query for the period you want to analyse an A/B test for to get information for all pages visited in that
-period. The output file is then used to calculate our metrics. This file should be placed into `./data/metadata`.
-
 ## Preparing your python environment
-
 The Makefile assumes that the `python3` command is pointing to the correct distribution of python,
  which was 3.7 in development. To install the correct package dependencies run `make pip_install` from the project root.
 
 ## Setting environment variables
-
 A number of environment variables need to be set before running the modules on your system:
 
 |ENV VAR|Description|Nominal value|
@@ -39,7 +27,17 @@ A number of environment variables need to be set before running the modules on y
 |DATA_DIR|Path to the directory storing the data|`./data` (relative to the root of the repository -- you may need to set an absolute path)|
 |LOGGING_CONFIG|Path to the logging configuration file|`./logging.conf` (relative to the root of the repository -- you may need to set an absolute path)|
 |REPORTS_DIR|Path to the reports dir where reports and outputs are stored| `./reports` (relative to the root of the repository -- you may need to set an absolute path)|
-
+|BQ_KEY_DIR|Path to where your private key (.json) is. There should only be one key.|Not defined, you could point to the dir used in the data pipeline repo|
+ 
+ ## Metadata required for analysis
+Some of the metrics used in our analysis are derived from the types of pages that users visit;
+ is a page a "finding" or a "thing"? Users need a contemporary lookup table to determine this.
+`notebooks/document_type_query.ipynb` is a notebook with a query to work out from page document types whether those
+pages are "finding" pages or "thing" pages,
+ as detailed [here](https://docs.publishing.service.gov.uk/document-types/user_journey_document_supertype.html).
+Rerun this query for the period you want to analyse an A/B test for to get information for all pages visited in that
+period. The output file is then used to calculate our metrics. This file should be placed into `./data/metadata`.
+ 
  ## Supported A/B analyses
  * Related links
     * events with category `relatedLinkClicked` and action`Related content`
