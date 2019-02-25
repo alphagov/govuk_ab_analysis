@@ -205,30 +205,45 @@ def zconf_interval_two_samples(x_a, n_a, x_b, n_b, alpha=0.05):
     return p2 - p1 - z_critical * se, p2 - p1 + z_critical * se
 
 
-def bayesian_bootstrap_analysis(df, col_name=None, boot_reps=4000, seed=1337):
+def mean_bb(counter_X_keys, counter_X_vals, n_replications):
+    """Simulate the posterior distribution of the mean.
+    Parameter X: The observed data (array like)
+    Parameter n_replications: The number of bootstrap replications to perform (positive integer)
+    Returns: Samples from the posterior
+    """
+    samples = []
+    weights = np.random.dirichlet(counter_X_vals, n_replications)
+    for w in weights:
+        samples.append(np.dot(counter_X_keys, w))
+    return samples
+
+
+def bayesian_bootstrap_analysis(df, col_name=None, boot_reps=10000, seed=1337):
     """Run bayesian bootstrap on the mean of a variable of interest between Page Variants.
 
     Args:
         df: A rl_sampled_processed pandas Datframe.
         col_name: A string of the column of interest.
-        boot_reps: An int for the number of times to resample.
-        seed: for reproducibility.
+        boot_reps: An int of number of resamples with replacement.
+        seed: A int random seed for reproducibility.
 
     Returns:
         a_bootstrap: a vector of boot_reps n resampled means from A.
         b_bootstrap: a vector of boot_reps n resampled means from B.
         """
-    # need to roll out the data, to resample from, deaggregate on one variable of interest
-    # we want to repeat each row's journey length by it's occurrences
-    # so more common journey lengths are more likely to be sampled
-    a_r = np.repeat(df.loc[df.ABVariant == "A", col_name], df.loc[df.ABVariant == "A", "Occurrences"])
-    b_r = np.repeat(df.loc[df.ABVariant == "B", col_name], df.loc[df.ABVariant == "B", "Occurrences"])
-    # for reproducibility, set the seed within this context
     with NumpyRNGContext(seed):
-        a_bootstrap = bb.mean(a_r.values, n_replications=boot_reps)
-        b_bootstrap = bb.mean(b_r.values, n_replications=boot_reps)
+        A_grouped_by_length = df[df.ABVariant == "A"].groupby(
+            col_name).sum().reset_index()
+        B_grouped_by_length = df[df.ABVariant == "B"].groupby(
+            col_name).sum().reset_index()
+        a_bootstrap = mean_bb(A_grouped_by_length[col_name],
+                              A_grouped_by_length['Occurrences'],
+                              boot_reps)
+        b_bootstrap = mean_bb(B_grouped_by_length[col_name],
+                              B_grouped_by_length['Occurrences'],
+                              boot_reps)
 
-        return a_bootstrap, b_bootstrap
+    return a_bootstrap, b_bootstrap
 
 
 def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
