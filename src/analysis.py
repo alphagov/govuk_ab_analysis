@@ -403,10 +403,11 @@ def analyse_sampled_processed_journey(data_dir, filename):
     logger.info(f"Saving to {out_path}")
     df_ab.to_csv(out_path, compression="gzip", index=False)
 
-    logger.info('Performing Bayesian bootstrap on Ratio of nav search to related links.')
+    logger.info('Performing Bayesian bootstrap on count of nav or search.')
 
-    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Ratio_Nav_Search_to_Rel')
+    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Content_Nav_or_Search_Count')
     # high density interval of page variants and difference posteriors
+    # ratio is vestigial name
     ratio_nav_stats = bb_hdi(a_bootstrap, b_bootstrap)
 
     df_ab_ratio = pd.Series(ratio_nav_stats).to_frame().T
@@ -425,7 +426,7 @@ def analyse_sampled_processed_journey(data_dir, filename):
 
     df_bayes = pd.concat([df_ab_ratio, df_ab_length])
     # modifies in place
-    df_bayes.insert(0, 'Metric', ['Ratio_Nav_Search_to_Rel', 'Page_List_Length'])
+    df_bayes.insert(0, 'Metric', ['Content_Nav_or_Search_Count', 'Page_List_Length'])
 
     logger.info('Saving df with related links derived variables to rl_sampled_processed_journey dir')
     out_path = os.path.join(DATA_DIR, "rl_sampled_processed_journey", ("bayesbootstrap_" + f"{filename}"))
