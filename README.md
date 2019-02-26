@@ -6,7 +6,9 @@ An analytical pipeline for analysing A/B test data output from this
   The data should be provided as one `processed_journey.csv.gz` file per day the test was run.
    This pipeline will then be `sample.py`'ed from those days provided to achieve a user defined sample size.
     This outputs a single `sampled_processed_journey.csv.gz` file that is analysed with `analysis.py`. 
-    This outputs the knowledge to inform a decision whether there was a difference between page variants A and B.
+    The analysis will check statistical assumptions for you and alert you if there is a problem.
+    The script or notebook options outputs the information for a statistician to interpret. 
+     This knowledge can inform a decision as to whether there was a difference between page variants A and B.
 
 ## Requirements
 * Python 3.7
@@ -151,18 +153,25 @@ optional arguments:
 
 Our processed and sampled journey data from `sample_processed.py`, following the above example is
  `full_sample_taxon_ab_2019_947858.csv.gz` in `sampled_journey` in `DATA_DIR`.
+ 
+When implementation this analysis for the first time it is recommended to use the notebook to take yourself through the 
+thinking and analysis.  We deliberately leave in the function definitions to this end.
+ The script contains the most up to date code. 
 #### Using the notebook
 You can open the `generate_ab_rl_mvp.ipynb` notebook and adjust the `filename` therein,
  to `full_sample_taxon_ab_2019_947858.csv.gz`. The bootstrap reps is set to a standard 10,000 and alpha  
- of 0.05 is automatically corrected to ~0.0125 after the Bon Ferroni correction of alpha / number of tests.
+ of 0.05 is automatically corrected to ~0.0125 after the Bon Ferroni correction of alpha / number of tests. 
+ Prior to running the code you may want to uncomment the cell in section 6.1 Save, in case your kernel 
+ crashes during bootstrapping.
 
 #### Running the analysis module programmatically
 In the console run the script and pass it the `filename` of the processed sampled dataframe found in the `sampled_journey` directory in DATA_DIR. 
+The lookup table for page content document type also needs to be passed. See earlier in the README for getting this data. 
 You can also adjust the logging level for extra verbosity and detail as the derivation of metrics can take some time. 
 We suggest you leave the default settings for alpha, m and boot_reps.  
 
 ```
-src/analysis.py sampled_processed_journey.csv.gz --debug-level DEBUG
+src/analysis.py sampled_processed_journey.csv.gz document_types.csv.gz --debug-level DEBUG
 ```
 
 This analyses and compares the difference of various metrics by page variant. 

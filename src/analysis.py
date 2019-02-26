@@ -275,7 +275,7 @@ def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
     ypa_diff = np.array(b_bootstrap) - np.array(a_bootstrap)
     ypa_diff_mean = ypa_diff.mean()
     # get the hdi
-    ypa_diff_ci_low, ypa_diff_ci_hi = bb.highest_density_interval(ypa_diff)
+    ypa_diff_ci_low, ypa_diff_ci_hi = bb.highest_density_interval(ypa_diff, alpha=alpha)
     # We count the number of values greater than 0 and divide by the total number
     # of observations
     # which returns us the the proportion of values in the distribution that are
@@ -290,7 +290,7 @@ def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
 
 
 # main
-def analyse_sampled_processed_journey(data_dir, filename):
+def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps):
     """
         Conducts various A/B tests on one sampled processed journey file.
 
@@ -306,6 +306,8 @@ def analyse_sampled_processed_journey(data_dir, filename):
                 found in.
             filename (str): The filename of the sampled processed journey, please include
             any .csv.gz etc extensions.
+            alpha: The corrected false positive rate.
+            boot_reps: int of number of statistics generated from resampling to create distribution.
         Returns:
            pandas.core.frame.DataFrame: A data frame containing statistics of the A/B tests on various metrics.
         """
@@ -374,7 +376,7 @@ def analyse_sampled_processed_journey(data_dir, filename):
     df_ab = pd.Series(rl_stats).to_frame().T
     logger.debug(df_ab)
     ci_low, ci_upp = zconf_interval_two_samples(rl_stats['x_a'], rl_stats['n_a'],
-                                                rl_stats['x_b'], rl_stats['n_b'], alpha=0.01)
+                                                rl_stats['x_b'], rl_stats['n_b'], alpha=alpha)
     logger.debug(' 95% Confidence Interval = ( {0:.2f}% , {1:.2f}% )'
                  .format(100 * ci_low, 100 * ci_upp))
     df_ab['ci_low'] = ci_low
@@ -387,8 +389,8 @@ def analyse_sampled_processed_journey(data_dir, filename):
     df_ab_nav = pd.Series(nav_stats).to_frame().T
     logger.debug(df_ab_nav)
     ci_low, ci_upp = zconf_interval_two_samples(nav_stats['x_a'], nav_stats['n_a'],
-                                                nav_stats['x_b'], nav_stats['n_b'], alpha=0.01)
-    logger.debug(' 95% Confidence Interval = ( {0:.2f}% , {1:.2f}% )'
+                                                nav_stats['x_b'], nav_stats['n_b'], alpha=alpha)
+    logger.debug(' 1-alpha % Confidence Interval = ( {0:.2f}% , {1:.2f}% )'
                  .format(100 * ci_low, 100 * ci_upp))
     # assign a dict to row of dataframe
     df_ab_nav['ci_low'] = ci_low
@@ -405,19 +407,20 @@ def analyse_sampled_processed_journey(data_dir, filename):
 
     logger.info('Performing Bayesian bootstrap on count of nav or search.')
 
-    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Content_Nav_or_Search_Count')
+    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Content_Nav_or_Search_Count',
+                                                           boot_reps=boot_reps)
     # high density interval of page variants and difference posteriors
     # ratio is vestigial name
-    ratio_nav_stats = bb_hdi(a_bootstrap, b_bootstrap)
+    ratio_nav_stats = bb_hdi(a_bootstrap, b_bootstrap, alpha=alpha)
 
     df_ab_ratio = pd.Series(ratio_nav_stats).to_frame().T
     logger.debug(df_ab_ratio)
 
     logger.info('Performing Bayesian bootstrap on Page_List_Length')
 
-    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Page_List_Length')
+    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Page_List_Length', boot_reps=boot_reps)
     # high density interval of page variants and difference posteriors
-    length_stats = bb_hdi(a_bootstrap, b_bootstrap)
+    length_stats = bb_hdi(a_bootstrap, b_bootstrap, alpha=alpha)
 
     df_ab_length = pd.Series(length_stats).to_frame().T
     logger.debug(df_ab_length)
@@ -520,4 +523,4 @@ if __name__ == "__main__":  # our module is being executed as a program
     finding_page_paths = df_finding_thing[
         df_finding_thing['is_finding'] == 1]['pagePath'].tolist()
 
-    analyse_sampled_processed_journey(DATA_DIR, args.filename)
+    analyse_sampled_processed_journey(DATA_DIR, args.filename, alpha=args.alpha / args.m, boot_reps=args.boot_reps)
