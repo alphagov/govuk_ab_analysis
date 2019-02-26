@@ -105,8 +105,9 @@ ideally specify a k a few journeys higher than the k you require.
 ### analysis.py
 
 ```
-
-usage: analysis.py [-h] [--debug-level DEBUG_LEVEL] filename
+usage: analysis.py [-h] [--alpha ALPHA] [--m M] [--boot_reps BOOT_REPS]
+                   [--debug-level DEBUG_LEVEL]
+                   filename
 
 Analysing sampled processed data module
 
@@ -122,6 +123,28 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  --alpha ALPHA         The false positive rate. With respect to hypothesis
+                        tests , alpha refers to significance level, the
+                        probability of making a Type I error.
+  --m M                 The number of hypotheses tested. Given we are testing
+                        4 null hypotheses we should control for multiple
+                        comparisons, the simplest and most conservative
+                        approach is to use the Bonferroni correction, alpha /
+                        m. So 0.05 / 4 = 0.0125 = alpha_corrected The
+                        Bonferroni correction can be used to adjust confidence
+                        intervals. If one establishes m confidence intervals,
+                        and wishes to have an overall confidence level of
+                        1-alpha, each individual confidence interval can be
+                        adjusted to the level of 1-(alpha/m).
+  --boot_reps BOOT_REPS
+                        The number of bootstrap replicates. The number of
+                        times we draw n-1 times with replacement from a sample
+                        and estimate a statistic. Monte Carlo sampling builds
+                        an estimate of the sampling distribution by randomly
+                        drawing a large number of samples of size boot_reps
+                        from a population, and calculating for each one the
+                        associated value of the statistic. In this module we
+                        calculate the mean.
   --debug-level DEBUG_LEVEL
                         debug level of messages (DEBUG, INFO, WARNING etc...)
 ```
@@ -130,13 +153,13 @@ Our processed and sampled journey data from `sample_processed.py`, following the
  `full_sample_taxon_ab_2019_947858.csv.gz` in `sampled_journey` in `DATA_DIR`.
 #### Using the notebook
 You can open the `generate_ab_rl_mvp.ipynb` notebook and adjust the `filename` therein,
- to `full_sample_taxon_ab_2019_947858.csv.gz`. The bootstrap reps is set to a standard 10,000 and alpha is 
- set to 0.01 after the Bon Ferroni correction of alpha / number of tests
-  (alpha ~ 0.05 for the related links experiments).
+ to `full_sample_taxon_ab_2019_947858.csv.gz`. The bootstrap reps is set to a standard 10,000 and alpha  
+ of 0.05 is automatically corrected to ~0.0125 after the Bon Ferroni correction of alpha / number of tests.
 
 #### Running the analysis module programmatically
 In the console run the script and pass it the `filename` of the processed sampled dataframe found in the `sampled_journey` directory in DATA_DIR. 
-You can also adjust the logging level for extra verbosity and detail as the derivation of metrics can take some time.
+You can also adjust the logging level for extra verbosity and detail as the derivation of metrics can take some time. 
+We suggest you leave the default settings for alpha, m and boot_reps.  
 
 ```
 src/analysis.py sampled_processed_journey.csv.gz --debug-level DEBUG

@@ -449,6 +449,44 @@ if __name__ == "__main__":  # our module is being executed as a program
                         bayesbootstrap_<<filename_prefix>>.csv.gz and
                          zprop_<<filename_prefix>>.csv.gz
         ''')
+    parser.add_argument(
+        'document_types_filename', default='document_types', help='''
+        Filename of the lookup table in `./data/metadata` for page document type including .csv.gz.
+        
+        Users need a contemporary lookup table to determine the type of content a page is; whether it's a 
+        "finding" or a "thing" page. See README for details of getting this data.
+        ''')
+    parser.add_argument(
+        '--alpha', default=0.05, help='''
+           The false positive rate.
+           
+           With respect to hypothesis tests , alpha refers to significance level, 
+           the probability of making a Type I error.
+            ''')
+    parser.add_argument(
+        '--m', default=4, help='''
+               The number of hypotheses tested.
+               
+               Given we are testing 4 null hypotheses we should control for multiple comparisons, 
+               the simplest and most conservative approach is to use the Bonferroni correction, 
+               alpha / m. So 0.05 / 4 = 0.0125 = alpha_corrected 
+               
+               The Bonferroni correction can be used to adjust confidence intervals. 
+               If one establishes m confidence intervals, and wishes to have an overall confidence level of 1-alpha, 
+               each individual confidence interval can be adjusted to the level of 1-(alpha/m).
+ 
+                ''')
+    parser.add_argument(
+        '--boot_reps', default=10000, help='''
+               The number of bootstrap replicates.
+               
+               The number of times we draw n-1 times with replacement from a sample and estimate a statistic. 
+               
+               Monte Carlo sampling builds an estimate of the sampling distribution by randomly 
+               drawing a large number of samples of size boot_reps from a population, and calculating for 
+               each one the associated value of the statistic. In this module we calculate the mean.
+
+                ''')
     parser.add_argument('--debug-level', default="INFO",
                         help='debug level of messages (DEBUG, INFO, WARNING'
                              ' etc...)')
@@ -468,7 +506,7 @@ if __name__ == "__main__":  # our module is being executed as a program
 
     metadata_path = os.path.join(
         DATA_DIR, 'metadata',
-        'document_types.csv.gz')
+        args.document_types_filename)
 
     logger.debug(f'Reading in metadata from {metadata_path}')
     df_finding_thing = pd.read_csv(metadata_path, sep="\t", compression="gzip")
