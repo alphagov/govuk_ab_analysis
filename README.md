@@ -18,8 +18,7 @@ to work out from page document types whether those pages are "finding" pages or 
 See `notebooks/document_type_query.ipynb` for details.
 
 ## Preparing your python environment
-The Makefile assumes that the `python3` command is pointing to the correct distribution of python,
- which was 3.7 in development. To install the correct package dependencies run `make pip_install` from the project root.
+Run `pip install -r requirements.txt` to install package dependencies. 
 
 ## Setting environment variables
 A number of environment variables need to be set before running the modules on your system:
