@@ -205,30 +205,45 @@ def zconf_interval_two_samples(x_a, n_a, x_b, n_b, alpha=0.05):
     return p2 - p1 - z_critical * se, p2 - p1 + z_critical * se
 
 
-def bayesian_bootstrap_analysis(df, col_name=None, boot_reps=4000, seed=1337):
+def mean_bb(counter_X_keys, counter_X_vals, n_replications):
+    """Simulate the posterior distribution of the mean.
+    Parameter X: The observed data (array like)
+    Parameter n_replications: The number of bootstrap replications to perform (positive integer)
+    Returns: Samples from the posterior
+    """
+    samples = []
+    weights = np.random.dirichlet(counter_X_vals, n_replications)
+    for w in weights:
+        samples.append(np.dot(counter_X_keys, w))
+    return samples
+
+
+def bayesian_bootstrap_analysis(df, col_name=None, boot_reps=10000, seed=1337):
     """Run bayesian bootstrap on the mean of a variable of interest between Page Variants.
 
     Args:
         df: A rl_sampled_processed pandas Datframe.
         col_name: A string of the column of interest.
-        boot_reps: An int for the number of times to resample.
-        seed: for reproducibility.
+        boot_reps: An int of number of resamples with replacement.
+        seed: A int random seed for reproducibility.
 
     Returns:
         a_bootstrap: a vector of boot_reps n resampled means from A.
         b_bootstrap: a vector of boot_reps n resampled means from B.
         """
-    # need to roll out the data, to resample from, deaggregate on one variable of interest
-    # we want to repeat each row's journey length by it's occurrences
-    # so more common journey lengths are more likely to be sampled
-    a_r = np.repeat(df.loc[df.ABVariant == "A", col_name], df.loc[df.ABVariant == "A", "Occurrences"])
-    b_r = np.repeat(df.loc[df.ABVariant == "B", col_name], df.loc[df.ABVariant == "B", "Occurrences"])
-    # for reproducibility, set the seed within this context
     with NumpyRNGContext(seed):
-        a_bootstrap = bb.mean(a_r.values, n_replications=boot_reps)
-        b_bootstrap = bb.mean(b_r.values, n_replications=boot_reps)
+        A_grouped_by_length = df[df.ABVariant == "A"].groupby(
+            col_name).sum().reset_index()
+        B_grouped_by_length = df[df.ABVariant == "B"].groupby(
+            col_name).sum().reset_index()
+        a_bootstrap = mean_bb(A_grouped_by_length[col_name],
+                              A_grouped_by_length['Occurrences'],
+                              boot_reps)
+        b_bootstrap = mean_bb(B_grouped_by_length[col_name],
+                              B_grouped_by_length['Occurrences'],
+                              boot_reps)
 
-        return a_bootstrap, b_bootstrap
+    return a_bootstrap, b_bootstrap
 
 
 def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
@@ -260,7 +275,7 @@ def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
     ypa_diff = np.array(b_bootstrap) - np.array(a_bootstrap)
     ypa_diff_mean = ypa_diff.mean()
     # get the hdi
-    ypa_diff_ci_low, ypa_diff_ci_hi = bb.highest_density_interval(ypa_diff)
+    ypa_diff_ci_low, ypa_diff_ci_hi = bb.highest_density_interval(ypa_diff, alpha=alpha)
     # We count the number of values greater than 0 and divide by the total number
     # of observations
     # which returns us the the proportion of values in the distribution that are
@@ -275,7 +290,7 @@ def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
 
 
 # main
-def analyse_sampled_processed_journey(data_dir, filename):
+def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps):
     """
         Conducts various A/B tests on one sampled processed journey file.
 
@@ -291,6 +306,8 @@ def analyse_sampled_processed_journey(data_dir, filename):
                 found in.
             filename (str): The filename of the sampled processed journey, please include
             any .csv.gz etc extensions.
+            alpha: The corrected false positive rate.
+            boot_reps: int of number of statistics generated from resampling to create distribution.
         Returns:
            pandas.core.frame.DataFrame: A data frame containing statistics of the A/B tests on various metrics.
         """
@@ -359,7 +376,7 @@ def analyse_sampled_processed_journey(data_dir, filename):
     df_ab = pd.Series(rl_stats).to_frame().T
     logger.debug(df_ab)
     ci_low, ci_upp = zconf_interval_two_samples(rl_stats['x_a'], rl_stats['n_a'],
-                                                rl_stats['x_b'], rl_stats['n_b'], alpha=0.01)
+                                                rl_stats['x_b'], rl_stats['n_b'], alpha=alpha)
     logger.debug(' 95% Confidence Interval = ( {0:.2f}% , {1:.2f}% )'
                  .format(100 * ci_low, 100 * ci_upp))
     df_ab['ci_low'] = ci_low
@@ -372,8 +389,8 @@ def analyse_sampled_processed_journey(data_dir, filename):
     df_ab_nav = pd.Series(nav_stats).to_frame().T
     logger.debug(df_ab_nav)
     ci_low, ci_upp = zconf_interval_two_samples(nav_stats['x_a'], nav_stats['n_a'],
-                                                nav_stats['x_b'], nav_stats['n_b'], alpha=0.01)
-    logger.debug(' 95% Confidence Interval = ( {0:.2f}% , {1:.2f}% )'
+                                                nav_stats['x_b'], nav_stats['n_b'], alpha=alpha)
+    logger.debug(' 1-alpha % Confidence Interval = ( {0:.2f}% , {1:.2f}% )'
                  .format(100 * ci_low, 100 * ci_upp))
     # assign a dict to row of dataframe
     df_ab_nav['ci_low'] = ci_low
@@ -388,20 +405,22 @@ def analyse_sampled_processed_journey(data_dir, filename):
     logger.info(f"Saving to {out_path}")
     df_ab.to_csv(out_path, compression="gzip", index=False)
 
-    logger.info('Performing Bayesian bootstrap on Ratio of nav search to related links.')
+    logger.info('Performing Bayesian bootstrap on count of nav or search.')
 
-    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Ratio_Nav_Search_to_Rel')
+    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Content_Nav_or_Search_Count',
+                                                           boot_reps=boot_reps)
     # high density interval of page variants and difference posteriors
-    ratio_nav_stats = bb_hdi(a_bootstrap, b_bootstrap)
+    # ratio is vestigial name
+    ratio_nav_stats = bb_hdi(a_bootstrap, b_bootstrap, alpha=alpha)
 
     df_ab_ratio = pd.Series(ratio_nav_stats).to_frame().T
     logger.debug(df_ab_ratio)
 
     logger.info('Performing Bayesian bootstrap on Page_List_Length')
 
-    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Page_List_Length')
+    a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Page_List_Length', boot_reps=boot_reps)
     # high density interval of page variants and difference posteriors
-    length_stats = bb_hdi(a_bootstrap, b_bootstrap)
+    length_stats = bb_hdi(a_bootstrap, b_bootstrap, alpha=alpha)
 
     df_ab_length = pd.Series(length_stats).to_frame().T
     logger.debug(df_ab_length)
@@ -410,7 +429,7 @@ def analyse_sampled_processed_journey(data_dir, filename):
 
     df_bayes = pd.concat([df_ab_ratio, df_ab_length])
     # modifies in place
-    df_bayes.insert(0, 'Metric', ['Ratio_Nav_Search_to_Rel', 'Page_List_Length'])
+    df_bayes.insert(0, 'Metric', ['Content_Nav_or_Search_Count', 'Page_List_Length'])
 
     logger.info('Saving df with related links derived variables to rl_sampled_processed_journey dir')
     out_path = os.path.join(DATA_DIR, "rl_sampled_processed_journey", ("bayesbootstrap_" + f"{filename}"))
@@ -433,6 +452,44 @@ if __name__ == "__main__":  # our module is being executed as a program
                         bayesbootstrap_<<filename_prefix>>.csv.gz and
                          zprop_<<filename_prefix>>.csv.gz
         ''')
+    parser.add_argument(
+        'document_types_filename', default='document_types', help='''
+        Filename of the lookup table in `./data/metadata` for page document type including .csv.gz.
+        
+        Users need a contemporary lookup table to determine the type of content a page is; whether it's a 
+        "finding" or a "thing" page. See README for details of getting this data.
+        ''')
+    parser.add_argument(
+        '--alpha', default=0.05, help='''
+           The false positive rate.
+           
+           With respect to hypothesis tests , alpha refers to significance level, 
+           the probability of making a Type I error.
+            ''')
+    parser.add_argument(
+        '--m', default=4, help='''
+               The number of hypotheses tested.
+               
+               Given we are testing 4 null hypotheses we should control for multiple comparisons, 
+               the simplest and most conservative approach is to use the Bonferroni correction, 
+               alpha / m. So 0.05 / 4 = 0.0125 = alpha_corrected 
+               
+               The Bonferroni correction can be used to adjust confidence intervals. 
+               If one establishes m confidence intervals, and wishes to have an overall confidence level of 1-alpha, 
+               each individual confidence interval can be adjusted to the level of 1-(alpha/m).
+ 
+                ''')
+    parser.add_argument(
+        '--boot_reps', default=10000, help='''
+               The number of bootstrap replicates.
+               
+               The number of times we draw n-1 times with replacement from a sample and estimate a statistic. 
+               
+               Monte Carlo sampling builds an estimate of the sampling distribution by randomly 
+               drawing a large number of samples of size boot_reps from a population, and calculating for 
+               each one the associated value of the statistic. In this module we calculate the mean.
+
+                ''')
     parser.add_argument('--debug-level', default="INFO",
                         help='debug level of messages (DEBUG, INFO, WARNING'
                              ' etc...)')
@@ -452,7 +509,7 @@ if __name__ == "__main__":  # our module is being executed as a program
 
     metadata_path = os.path.join(
         DATA_DIR, 'metadata',
-        'document_types.csv.gz')
+        args.document_types_filename)
 
     logger.debug(f'Reading in metadata from {metadata_path}')
     df_finding_thing = pd.read_csv(metadata_path, sep="\t", compression="gzip")
@@ -466,4 +523,4 @@ if __name__ == "__main__":  # our module is being executed as a program
     finding_page_paths = df_finding_thing[
         df_finding_thing['is_finding'] == 1]['pagePath'].tolist()
 
-    analyse_sampled_processed_journey(DATA_DIR, args.filename)
+    analyse_sampled_processed_journey(DATA_DIR, args.filename, alpha=args.alpha / args.m, boot_reps=args.boot_reps)
