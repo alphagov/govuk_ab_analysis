@@ -52,6 +52,10 @@ period. The output file is then used to calculate our metrics. This file should 
 An analytical pipeline for analysing A/B test data output from this [GOV.UK data pipeline](https://github.com/alphagov/govuk-network-data).
 
 ### stratify journeys into loved/unloved
+Our processed journey data from the [GOV.UK data pipeline](https://github.com/alphagov/govuk-network-data) 
+is in the `processed_journey` directory in our DATA_DIR (as specified in our `.envrc` file) and filenames are prefixed
+with taxon_ab. 
+
 Loved journeys are those which include at least one loved page.
 Unloved journeys do not contain any loved pages.
 
@@ -110,7 +114,12 @@ python src/sample_processed.py taxon_ab_2019 --k 947858 --debug-level DEBUG
 
 Our processed journey data from the [GOV.UK data pipeline](https://github.com/alphagov/govuk-network-data) 
 is in the `processed_journey` directory in our DATA_DIR (as specified in our `.envrc` file). We want to sample from all
-the files whose names begin with `taxon_ab_2019` and end with `.csv.gz`.
+the files whose names begin with `taxon_ab_2019` and end with `.csv.gz`. 
+
+A single row in `taxon_ab_2019*csv.gz` files represents a journey type which has been completed x times (Occurrences). 
+So sessions are rolled up. 
+The sampling selects journey types in proportion to the number of occurrences of that type
+(sampling is weighted by occurrences). Sessions are then rolled up into journey types.
 
 For this example we specify that we want 947858 journeys in each variant, a number we have come to after doing a 
 power analysis (see `z_prop_test_power_analysis.Rmd`). And we've set the debug level to DEBUG to be extra verbose, so 
