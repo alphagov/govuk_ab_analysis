@@ -51,6 +51,25 @@ period. The output file is then used to calculate our metrics. This file should 
 
 An analytical pipeline for analysing A/B test data output from this [GOV.UK data pipeline](https://github.com/alphagov/govuk-network-data).
 
+### stratify journeys into loved/unloved
+Loved journeys are those which include at least one loved page.
+Unloved journeys do not contain any loved pages.
+
+Loved pages are defined as any of:
+- pages with related links present:
+    - related_mainstream_content, 
+    - ordered_related_items,  
+    - part_of_step_navs or quick_links
+- foreign-travel-advice pages
+- hmrc_contact_pages  
+- help pages
+- premises-licence
+- find-local-council
+- smart answer
+
+To produce the files for loved and unloved journeys, from all taxon_ab*.csv.gz files in processed_journey, run the
+notebook: "get_unloved_and_loved_journeys.ipynb"
+
 ### sample_processed.py
 ```
 usage: sample_processed.py [-h] [--seed SEED] [--k K]
