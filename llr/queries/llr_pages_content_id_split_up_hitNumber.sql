@@ -138,6 +138,8 @@ WITH
   WHERE
     session_pages_1.content_id != session_pages_2.content_id
     -- page 2 should first be viewed after page 1 is first viewed
+    -- notation from original paper: http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=D07E6D669A68584704CF53A27703B49B?doi=10.1.1.14.5962&rep=rep1&type=pdf
+    -- the LLR contingency table counts of  k(~A, B) and k(A, B) assume A occurs before B in the sequence (not reciprocal so avoid double-counting)
     AND session_pages_1.hitNumber < session_pages_2.hitNumber
     -- either the page and the related link are both news items, or the related link is not a news item (we can recommend non news items on news pages, but not vice versa)
     AND (session_pages_2.is_news_item = 0
