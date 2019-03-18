@@ -103,6 +103,20 @@ def count_search_from_content(page_list):
                     search_from_content += 1
     return search_from_content
 
+def count_total_searches(df, group):
+    searches = df[df.ABVariant == group].groupby(
+            'Content_Nav_or_Search_Count').sum().iloc[:, 0].reset_index(0)
+    total_searches = searches['Content_Nav_or_Search_Count']*searches['Occurrences']
+    return sum(total_searches)
+
+
+def compare_total_searches(df):
+    print("total searches in A = {}".format(count_total_searches(df, "A")))
+    print("total searches in B = {}".format(count_total_searches(df, "B")))
+    percent_diff = abs(count_total_searches(df, "B") - count_total_searches(df, "A"))/(count_total_searches(df, "A")+count_total_searches(df, "B"))*100
+    print("B has {0} more navigation or searches than A a {1:.2f}% overall difference".format(count_total_searches(df, "B") - count_total_searches(df, "A"), percent_diff))
+    print("The relative change was {0:.2f}% from A to B".format((count_total_searches(df, "B") - count_total_searches(df, "A"))/count_total_searches(df, "A")*100))
+
 
 def z_prop(df, col_name):
     """
