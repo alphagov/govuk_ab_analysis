@@ -15,6 +15,9 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 ```
 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(pwr)
+```
 
 ## Power analysis for related links proportion z test
 
@@ -75,6 +78,21 @@ How many user journey sessions (n) do we need per page variant to be able to det
 m1 <- power.prop.test(p1 = .01, p2 = .0105,
                       power = 0.8, sig.level = 0.01)
 m1
+```
+
+When we stratfiy by unloved journeys, we are doing a one proportion p test. Is the proportion of use of related links greater than zero (in the unloved content there shouldn't be any journeys with rl use becuase, by definition, these would be loved jounreys). 
+
+Here's a quick check that given the estimated sample size for a 2 proportion test, we'd have enough power to do the one proportion test
+```{r}
+
+pwr.p.test(ES.h(p1= 0.05, p2=0), n = 947858, sig.level = 0.01, power = NULL,
+    alternative = c("greater"))
+```
+And just showing that you'd only need 25,090 journeys to detect an effect of 0.1% so we will have well-enough power at 947,858
+```{r}
+
+pwr.p.test(ES.h(p1= 0.0001, p2=0), n = NULL, sig.level = 0.01, power = 0.8,
+    alternative = c("greater"))
 ```
 
 ### Validate assumptions
