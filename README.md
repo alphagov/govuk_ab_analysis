@@ -50,6 +50,11 @@ period. The output file is then used to calculate our metrics. This file should 
         - Proportion of journeys containing no navigation events
 
 An analytical pipeline for analysing A/B test data output from this [GOV.UK data pipeline](https://github.com/alphagov/govuk-network-data).
+### Basic steps to acquire data for and run stratified analyses
+For more detail see sections below and the editable table is [here](https://docs.google.com/presentation/d/15HCMMV0nwKIIHdb6jW0tC81LnELMo7uvPhFLtypPa0w/edit#slide=id.p)
+
+![stratified data prep and analyses steps](dataprep_analyses_steps.jpg)
+ 
 
 ### stratify journeys into loved/unloved
 Our processed journey data from the [GOV.UK data pipeline](https://github.com/alphagov/govuk-network-data) 
