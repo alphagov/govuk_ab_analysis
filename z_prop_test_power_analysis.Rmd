@@ -85,7 +85,7 @@ When we stratfiy by unloved journeys, we are doing a one proportion p test. Is t
 Here's a quick check that given the estimated sample size for a 2 proportion test, we'd have enough power to do the one proportion test
 ```{r}
 
-pwr.p.test(ES.h(p1= 0.05, p2=0), n = 947858, sig.level = 0.01, power = NULL,
+pwr.p.test(ES.h(p1= 0.01, p2=0), n = 947858, sig.level = 0.01, power = NULL,
     alternative = c("greater"))
 ```
 And just showing that you'd only need 25,090 journeys to detect an effect of 0.1% so we will have well-enough power at 947,858
