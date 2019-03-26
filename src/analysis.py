@@ -261,8 +261,8 @@ def bayesian_bootstrap_analysis(df, col_name=None, boot_reps=10000, seed=1337, v
         """
     if variant_dict is None:
         variant_dict = {
-            'CONTROL_GROUP':'A',
-            'INTERVENTION_GROUP':'B'
+            'CONTROL_GROUP':'B',
+            'INTERVENTION_GROUP':'C'
         }
         logging.info('assigning defaults for variants: control group = "A" and intervention = "B"')
 
