@@ -203,7 +203,7 @@ You can also adjust the logging level for extra verbosity and detail as the deri
 We suggest you leave the default settings for alpha, m and boot_reps.  
 
 ```
-src/analysis.py sampled_processed_journey.csv.gz document_types.csv.gz --debug-level DEBUG
+python src/analysis.py full_sample_loved_947858.csv.gz document_types.csv.gz --debug-level DEBUG --control_group "B" --intervention_group "C"
 ```
 
 This analyses and compares the difference of various metrics by page variant. 

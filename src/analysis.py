@@ -343,6 +343,7 @@ def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps, vari
             any .csv.gz etc extensions.
             alpha: The corrected false positive rate.
             boot_reps: int of number of statistics generated from resampling to create distribution.
+            variants: list containing two str elements defining the control and intervention group labels
         Returns:
            pandas.core.frame.DataFrame: A data frame containing statistics of the A/B tests on various metrics.
         """
@@ -532,10 +533,12 @@ if __name__ == "__main__":  # our module is being executed as a program
 
                 ''')
     parser.add_argument(
-        '--variants', default=["A", "B"], help='''
-                   list of the two capital letters that define the control variant (e.g., "A") and the intervention
-                   (e.g., "B") in the format ["B", "C"]
-
+        '--control_group', default="B", help='''
+                   Capital letter that defines the control variant (e.g., "B")
+                    ''')
+    parser.add_argument(
+        '--intervention_group', default="C", help='''
+                   Capital letter that defines the intervention variant (e.g., "C")
                     ''')
     parser.add_argument('--debug-level', default="INFO",
                         help='debug level of messages (DEBUG, INFO, WARNING'
@@ -571,4 +574,4 @@ if __name__ == "__main__":  # our module is being executed as a program
         df_finding_thing['is_finding'] == 1]['pagePath'].tolist()
 
     analyse_sampled_processed_journey(DATA_DIR, args.filename, alpha=args.alpha / args.m, boot_reps=args.boot_reps,
-                                      variants=args.variants)
+                                      variants=list(args.control_group, args.intervention_group))
