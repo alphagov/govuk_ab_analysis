@@ -112,24 +112,22 @@ def count_total_searches(df, group):
 
 
 def compare_total_searches(df, variant_dict):
-    print("total searches in A = {}".format(count_total_searches(df, variant_dict['CONTROL_GROUP'])))
-    print("total searches in B = {}".format(count_total_searches(df, variant_dict['INTERVENTION_GROUP'])))
-    percent_diff = abs(count_total_searches(
-        df, variant_dict['INTERVENTION_GROUP']) -
-                       count_total_searches(df, variant_dict['CONTROL_GROUP'])
-                       )/\
-                   (count_total_searches(df, variant_dict['CONTROL_GROUP'])+
-                    count_total_searches(df, variant_dict['INTERVENTION_GROUP']))*100
-    print("B has {0} more navigation or searches than A a {1:.2f}% overall difference".format(
-        count_total_searches(df, variant_dict['INTERVENTION_GROUP']) -
-        count_total_searches(df, variant_dict['CONTROL_GROUP']),
-        percent_diff)
-    )
-    print("The relative change was {0:.2f}% from A to B".format(
-        (count_total_searches(df, variant_dict['INTERVENTION_GROUP']) -
-         count_total_searches(df, variant_dict['CONTROL_GROUP'])
-         )/count_total_searches(df, variant_dict['CONTROL_GROUP'])*100)
-    )
+    control = count_total_searches(df, variant_dict['CONTROL_GROUP'])
+    intervention = count_total_searches(df, variant_dict['INTERVENTION_GROUP'])
+    print("total searches in control group = {}".format(control))
+    print("total searches in intervention group = {}".format(intervention))
+    percent_diff = abs((intervention - control)/(control + intervention))*100
+    
+    if control>intervention:
+        print("intervention has {} fewer navigation or searches than control;".format(control-intervention))
+        
+    if intervention>control:
+        print("intervention has {} more navigation or searches than control;".format(intervention-control))
+    
+    print("a {0:.2f}% overall difference".format(percent_diff))
+    print("The relative change was {0:.2f}% from control to intervention".format(
+        ((intervention - control)/control)*100
+    ))
 
 
 def z_prop(df, col_name, variant_dict):
@@ -152,7 +150,7 @@ def z_prop(df, col_name, variant_dict):
     # A
     # number of trials for page A
     n_a = df[df.ABVariant == variant_dict['CONTROL_GROUP']].Occurrences.sum()
-    # number of successes (occurrences), for page A and at least one related link clicked journeys
+    # number of successes (oc currences), for page A and at least one related link clicked journeys
     x_a = df[(df['ABVariant'] == variant_dict['CONTROL_GROUP']) & (df[col_name] == 1)].Occurrences.sum()
     # prop of journeys where one related link was clicked, on A
     p_a = x_a / n_a
