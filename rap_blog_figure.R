@@ -8,6 +8,8 @@ df <- read_csv("2019-03-22-summary_results_ci_all_experiments - Sheet1.csv")
 
 df <- df %>%
   mutate(name = paste(experiment, iteration, sep = "_")) %>%
+  mutate_at(vars(name, metric, loved), as_factor))
+  mutate(name = paste(experiment, iteration, sep = "_")) %>%
   mutate(name = as_factor(name)) %>%
   mutate(metric = as_factor(metric)) %>%
   mutate(loved = as_factor(loved))
