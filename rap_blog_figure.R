@@ -34,16 +34,14 @@ p2 <- ggplot(data=df_unloved,
              aes(x = name,y = (100*mean_diff),
                  ymin = (100*lci), ymax = (100*uci) ))+
   geom_pointrange(aes(col=name))+
-  xlab('')+ ylab("Reduction in journeys \n using internal search (%)")+
+  ylab("Reduction in journeys \n using internal search (%)")+
 # as percentages rather than proportions
   geom_errorbar(aes(ymin=(100*lci), ymax=(100*uci),col=name),
-                width = 0.8, size = 0.5)
-
-p2 <- p2 + theme_classic()  +
+                width = 0.8, size = 0.5) +
+  theme_classic()  +
   theme(axis.text.x=element_text(angle=50, size=6, vjust=0.5)) +
   theme(axis.text.x=element_blank()) +
   ggtitle("") + ylim(0, 50) +
-  theme(axis.title.y = element_text(size=10))+
   xlab("Algorithms")+
   theme(axis.title.y = element_text(size=10))+
   theme(legend.position= c(0.82, 0.35),
@@ -53,6 +51,4 @@ p2 <- p2 + theme_classic()  +
   scale_colour_colorblind(name = "")
 
 # save
-png("rap_blog_ab.png", units="in", width=5, height=3, res=300)
-p2 
-dev.off()
+ggsave("rap_blog_ab.png", units="in", width=5, height=3, dpi=300)
