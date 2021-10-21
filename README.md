@@ -50,6 +50,34 @@ period. The output file is then used to calculate our metrics. This file should 
         - Proportion of journeys containing no navigation events
 
 An analytical pipeline for analysing A/B test data output from this [GOV.UK data pipeline](https://github.com/alphagov/govuk-network-data).
+### Basic steps to acquire data for and run stratified analyses
+For more detail see sections below and the editable table is [here](https://docs.google.com/presentation/d/15HCMMV0nwKIIHdb6jW0tC81LnELMo7uvPhFLtypPa0w/edit#slide=id.p)
+
+![stratified data prep and analyses steps](dataprep_analyses_steps.jpg)
+ 
+
+### stratify journeys into loved/unloved
+Our processed journey data from the [GOV.UK data pipeline](https://github.com/alphagov/govuk-network-data) 
+is in the `processed_journey` directory in our DATA_DIR (as specified in our `.envrc` file) and filenames are prefixed
+with taxon_ab. 
+
+Loved journeys are those which include at least one loved page.
+Unloved journeys do not contain any loved pages.
+
+Loved pages are defined as any of:
+- pages with related links present:
+    - related_mainstream_content, 
+    - ordered_related_items,  
+    - part_of_step_navs or quick_links
+- foreign-travel-advice pages
+- hmrc_contact_pages  
+- help pages
+- premises-licence
+- find-local-council
+- smart answer
+
+To produce the files for loved and unloved journeys, from all taxon_ab*.csv.gz files in processed_journey, run the
+notebook: "get_unloved_and_loved_journeys.ipynb"
 
 ### sample_processed.py
 ```
@@ -91,7 +119,12 @@ python src/sample_processed.py taxon_ab_2019 --k 947858 --debug-level DEBUG
 
 Our processed journey data from the [GOV.UK data pipeline](https://github.com/alphagov/govuk-network-data) 
 is in the `processed_journey` directory in our DATA_DIR (as specified in our `.envrc` file). We want to sample from all
-the files whose names begin with `taxon_ab_2019` and end with `.csv.gz`.
+the files whose names begin with `taxon_ab_2019` and end with `.csv.gz`. 
+
+A single row in `taxon_ab_2019*csv.gz` files represents a journey type which has been completed x times (Occurrences). 
+So sessions are rolled up. 
+The sampling selects journey types in proportion to the number of occurrences of that type
+(sampling is weighted by occurrences). Sessions are then rolled up into journey types.
 
 For this example we specify that we want 947858 journeys in each variant, a number we have come to after doing a 
 power analysis (see `z_prop_test_power_analysis.Rmd`). And we've set the debug level to DEBUG to be extra verbose, so 
@@ -170,7 +203,7 @@ You can also adjust the logging level for extra verbosity and detail as the deri
 We suggest you leave the default settings for alpha, m and boot_reps.  
 
 ```
-src/analysis.py sampled_processed_journey.csv.gz document_types.csv.gz --debug-level DEBUG
+python src/analysis.py full_sample_loved_947858.csv.gz document_types.csv.gz --debug-level DEBUG --control_group "B" --intervention_group "C"
 ```
 
 This analyses and compares the difference of various metrics by page variant. 

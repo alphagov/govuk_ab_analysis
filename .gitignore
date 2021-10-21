@@ -120,3 +120,7 @@ venv.bak/
 # mypy
 .mypy_cache/
 .Rproj.user
+*.jpg
+*.jpeg
+*.png
+*.gif

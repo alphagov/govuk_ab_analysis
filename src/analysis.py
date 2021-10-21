@@ -37,13 +37,14 @@ REQUIRED_COLUMNS = ["Occurrences", "ABVariant", "Page_Event_List",
                     ]
 
 
-def is_a_b(variant):
+def is_a_b(variant, variant_dict):
     """
     Is the value of the variant either 'A' or 'B'? Filters out junk data
     :param variant:
     :return: True or False
     """
-    return any([variant == x for x in ['A', 'B']])
+
+    return any([variant == x for x in list(variant_dict.values())])
 
 
 def get_number_of_events_rl(event):
@@ -103,8 +104,33 @@ def count_search_from_content(page_list):
                     search_from_content += 1
     return search_from_content
 
+def count_total_searches(df, group):
+    searches = df[df.ABVariant == group].groupby(
+            'Content_Nav_or_Search_Count').sum().iloc[:, 0].reset_index(0)
+    total_searches = searches['Content_Nav_or_Search_Count']*searches['Occurrences']
+    return sum(total_searches)
 
-def z_prop(df, col_name):
+
+def compare_total_searches(df, variant_dict):
+    control = count_total_searches(df, variant_dict['CONTROL_GROUP'])
+    intervention = count_total_searches(df, variant_dict['INTERVENTION_GROUP'])
+    print("total searches in control group = {}".format(control))
+    print("total searches in intervention group = {}".format(intervention))
+    percent_diff = abs((intervention - control)/(control + intervention))*100
+    
+    if control>intervention:
+        print("intervention has {} fewer navigation or searches than control;".format(control-intervention))
+        
+    if intervention>control:
+        print("intervention has {} more navigation or searches than control;".format(intervention-control))
+    
+    print("a {0:.2f}% overall difference".format(percent_diff))
+    print("The relative change was {0:.2f}% from control to intervention".format(
+        ((intervention - control)/control)*100
+    ))
+
+
+def z_prop(df, col_name, variant_dict):
     """
     Conduct z_prop test and generate confidence interval.
 
@@ -123,19 +149,20 @@ def z_prop(df, col_name):
 
     # A
     # number of trials for page A
-    n_a = df[df.ABVariant == "A"].Occurrences.sum()
-    # number of successes (occurrences), for page A and at least one related link clicked journeys
-    x_a = df[(df['ABVariant'] == 'A') & (df[col_name] == 1)].Occurrences.sum()
+    n_a = df[df.ABVariant == variant_dict['CONTROL_GROUP']].Occurrences.sum()
+    # number of successes (oc currences), for page A and at least one related link clicked journeys
+    x_a = df[(df['ABVariant'] == variant_dict['CONTROL_GROUP']) & (df[col_name] == 1)].Occurrences.sum()
     # prop of journeys where one related link was clicked, on A
     p_a = x_a / n_a
 
     # B
     # number of trials for page B
-    n_b = df[df.ABVariant == "B"].Occurrences.sum()
+    n_b = df[df.ABVariant == variant_dict['INTERVENTION_GROUP']].Occurrences.sum()
     # number of successes for page B, at least one related link clicked
-    x_b = df[(df['ABVariant'] == 'B') & (df[col_name] == 1)].Occurrences.sum()
+    x_b = df[(df['ABVariant'] ==  variant_dict['INTERVENTION_GROUP']) & (df[col_name] == 1)].Occurrences.sum()
     # prop of journeys where one related link was clicked, on B
     p_b = x_b / n_b
+
 
     assert (n == n_a + n_b), "Error in filtering by ABVariant!"
 
@@ -218,7 +245,7 @@ def mean_bb(counter_X_keys, counter_X_vals, n_replications):
     return samples
 
 
-def bayesian_bootstrap_analysis(df, col_name=None, boot_reps=10000, seed=1337):
+def bayesian_bootstrap_analysis(df, col_name=None, boot_reps=10000, seed=1337, variant_dict=None):
     """Run bayesian bootstrap on the mean of a variable of interest between Page Variants.
 
     Args:
@@ -226,15 +253,23 @@ def bayesian_bootstrap_analysis(df, col_name=None, boot_reps=10000, seed=1337):
         col_name: A string of the column of interest.
         boot_reps: An int of number of resamples with replacement.
         seed: A int random seed for reproducibility.
+        variant_dict:dictionary containing letter codes for CONTROL_GROUP and INTERVENTION_GROUP
 
     Returns:
         a_bootstrap: a vector of boot_reps n resampled means from A.
         b_bootstrap: a vector of boot_reps n resampled means from B.
         """
+    if variant_dict is None:
+        variant_dict = {
+            'CONTROL_GROUP':'B',
+            'INTERVENTION_GROUP':'C'
+        }
+        logging.info('assigning defaults for variants: control group = "A" and intervention = "B"')
+
     with NumpyRNGContext(seed):
-        A_grouped_by_length = df[df.ABVariant == "A"].groupby(
+        A_grouped_by_length = df[df.ABVariant == variant_dict['CONTROL_GROUP']].groupby(
             col_name).sum().reset_index()
-        B_grouped_by_length = df[df.ABVariant == "B"].groupby(
+        B_grouped_by_length = df[df.ABVariant == variant_dict['INTERVENTION_GROUP']].groupby(
             col_name).sum().reset_index()
         a_bootstrap = mean_bb(A_grouped_by_length[col_name],
                               A_grouped_by_length['Occurrences'],
@@ -290,7 +325,7 @@ def bb_hdi(a_bootstrap, b_bootstrap, alpha=0.05):
 
 
 # main
-def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps):
+def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps, variants):
     """
         Conducts various A/B tests on one sampled processed journey file.
 
@@ -308,9 +343,15 @@ def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps):
             any .csv.gz etc extensions.
             alpha: The corrected false positive rate.
             boot_reps: int of number of statistics generated from resampling to create distribution.
+            variants: list containing two str elements defining the control and intervention group labels
         Returns:
            pandas.core.frame.DataFrame: A data frame containing statistics of the A/B tests on various metrics.
         """
+    variant_dict = {
+        'CONTROL_GROUP': variants[0],
+        'INTERVENTION_GROUP': variants[1]
+    }
+
     logger.info(f"Analysing {filename} - calculating A/B test statistics...")
 
     in_path = os.path.join(data_dir, "sampled_journey", filename)
@@ -325,7 +366,7 @@ def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps):
                 " in-case the user did not sample...")
 
     # filter out any weird values like Object object
-    df.query("ABVariant in ['A', 'B']", inplace=True)
+    df.query("ABVariant in @variants", inplace=True)
 
     logger.debug(f'Cleaned DataFrame shape {df.shape}')
 
@@ -371,7 +412,7 @@ def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps):
 
     logger.debug('Performing z_prop test on prop with at least one related link.')
 
-    rl_stats = z_prop(df, 'Has_Related')
+    rl_stats = z_prop(df, 'Has_Related', variant_dict)
     # as it's one row needs to be a Series
     df_ab = pd.Series(rl_stats).to_frame().T
     logger.debug(df_ab)
@@ -384,7 +425,7 @@ def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps):
 
     logger.debug('Performing z_prop test on prop with content page nav event.')
 
-    nav_stats = z_prop(df, 'Has_No_Nav_Or_Search')
+    nav_stats = z_prop(df, 'Has_No_Nav_Or_Search', variant_dict)
     # concat rows
     df_ab_nav = pd.Series(nav_stats).to_frame().T
     logger.debug(df_ab_nav)
@@ -408,7 +449,8 @@ def analyse_sampled_processed_journey(data_dir, filename, alpha, boot_reps):
     logger.info('Performing Bayesian bootstrap on count of nav or search.')
 
     a_bootstrap, b_bootstrap = bayesian_bootstrap_analysis(df, col_name='Content_Nav_or_Search_Count',
-                                                           boot_reps=boot_reps)
+                                                           boot_reps=boot_reps,
+                                                           variant_dict=variant_dict)
     # high density interval of page variants and difference posteriors
     # ratio is vestigial name
     ratio_nav_stats = bb_hdi(a_bootstrap, b_bootstrap, alpha=alpha)
@@ -490,6 +532,14 @@ if __name__ == "__main__":  # our module is being executed as a program
                each one the associated value of the statistic. In this module we calculate the mean.
 
                 ''')
+    parser.add_argument(
+        '--control_group', default="B", help='''
+                   Capital letter that defines the control variant (e.g., "B")
+                    ''')
+    parser.add_argument(
+        '--intervention_group', default="C", help='''
+                   Capital letter that defines the intervention variant (e.g., "C")
+                    ''')
     parser.add_argument('--debug-level', default="INFO",
                         help='debug level of messages (DEBUG, INFO, WARNING'
                              ' etc...)')
@@ -523,4 +573,5 @@ if __name__ == "__main__":  # our module is being executed as a program
     finding_page_paths = df_finding_thing[
         df_finding_thing['is_finding'] == 1]['pagePath'].tolist()
 
-    analyse_sampled_processed_journey(DATA_DIR, args.filename, alpha=args.alpha / args.m, boot_reps=args.boot_reps)
+    analyse_sampled_processed_journey(DATA_DIR, args.filename, alpha=args.alpha / args.m, boot_reps=args.boot_reps,
+                                      variants=list(args.control_group, args.intervention_group))
