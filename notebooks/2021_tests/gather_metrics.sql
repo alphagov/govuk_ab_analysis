@@ -1,3 +1,14 @@
+-- for each day queried, returns counts of:
+-- visitors
+-- visitors_that_clicked related links on pages that didn't have manually curated related links
+-- visitors_2_or_more related links that day
+-- visitors_that_clicked_navigation elements - home link, breadcrumbs, and "Explore this topic" links
+-- visitors_that_used_search
+
+-- uses data created by notebooks/2021_tests/get pages with manually curated links.ipynb 
+-- that returns all the content items that have manually curated related links, this snapshot was
+-- uplaoded to BigQuery as `govuk-bigquery-analytics.datascience.manual_related_links_pages`
+
 WITH relevant_fields AS (
     SELECT
     date,
