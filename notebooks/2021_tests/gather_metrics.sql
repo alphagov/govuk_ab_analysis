@@ -56,20 +56,40 @@ per_visitor_table AS (
     GROUP BY
     date,
     fullVisitorId
+),
+
+counts AS (
+    SELECT 
+    date,
+    COUNT(DISTINCT fullVisitorId) AS visitors,
+    -- shall we also look at proportion of visitors that clicked related links more than once?
+    -- indicates the first link was good enough quality for them to not lose confidence in recommendations
+    COUNT(DISTINCT CASE WHEN number_rl_clicked > 0 THEN fullVisitorId END) AS visitors_that_clicked_rl,
+    COUNT(DISTINCT CASE WHEN number_rl_clicked > 1 THEN fullVisitorId END) AS visitors_2_or_more_rl,
+    -- clicking breadcrumbs, a link to the homepage, or "Explore the topic" links 
+    -- indicate a user may not be finding what they are looking for and related links aren't helpful to them
+    SUM(navigation_clicked) AS visitors_that_clicked_navigation,
+    COUNT(DISTINCT CASE WHEN number_rl_clicked > 0 AND navigation_clicked = 0 THEN fullVisitorId END) AS visitors_that_clicked_rl_and_no_nav,
+    -- an increase in users searching may indicate that more users are lost and related links aren't helping
+    SUM(search_used) AS visitors_that_used_search
+    FROM per_visitor_table
+    GROUP BY 
+    date
 )
 
-SELECT 
+SELECT
 date,
-COUNT(DISTINCT fullVisitorId) AS visitors,
--- shall we also look at proportion of visitors that clicked related links more than once?
--- indicates the first link was good enough quality for them to not lose confidence in recommendations
-COUNT(DISTINCT CASE WHEN number_rl_clicked > 0 THEN fullVisitorId END) AS visitors_that_clicked_rl,
-COUNT(DISTINCT CASE WHEN number_rl_clicked > 1 THEN fullVisitorId END) AS visitors_2_or_more_rl,
--- clicking breadcrumbs, a link to the homepage, or "Explore the topic" links 
--- indicate a user may not be finding what they are looking for and related links aren't helpful to them
-SUM(navigation_clicked) AS visitors_that_clicked_navigation,
--- an increase in users searching may indicate that more users are lost and related links aren't helping
-SUM(search_used) AS visitors_that_used_search
-FROM per_visitor_table
-GROUP BY 
-date
+visitors,
+visitors_that_clicked_rl,
+visitors_2_or_more_rl,
+visitors_that_clicked_navigation,
+visitors_that_clicked_rl_and_no_nav,
+visitors_that_used_search,
+-- proportions
+visitors_that_clicked_rl / visitors * 100 AS pc_visitors_used_rl,
+visitors_2_or_more_rl / visitors * 100 AS pc_visitors_2_or_more_rl,
+visitors_2_or_more_rl / visitors_that_clicked_rl * 100 AS pc_visitors_returning_to_rl,
+visitors_that_clicked_navigation / visitors * 100 AS pc_visitors_that_clicked_navigation,
+visitors_that_used_search / visitors * 100 AS pc_visitors_that_used_search
+FROM
+counts

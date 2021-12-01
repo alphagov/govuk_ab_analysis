@@ -9,3 +9,4 @@ seaborn
 bayesian_bootstrap
 astropy
 tqdm
+pymongo
