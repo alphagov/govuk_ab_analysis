@@ -45,10 +45,16 @@ per_visitor_table AS (
             -- list of content IDs with manually curated related links, generated using notebooks/2021_tests/get pages with manually curated links.ipynb
             FROM `govuk-bigquery-analytics.datascience.manual_related_links_pages`)
         THEN CONCAT(visitNumber,'-',hitNumber) END) AS number_rl_clicked,
-    MAX(CASE WHEN eventCategory IN ('breadcrumbClicked', 'homeLinkClicked')
+
+    MAX(CASE WHEN (eventCategory IN ('breadcrumbClicked', 'homeLinkClicked')
         OR (eventCategory = 'relatedLinkClicked' 
-            AND CONTAINS_SUBSTR(eventAction, 'Explore the topic'))
+            AND CONTAINS_SUBSTR(eventAction, 'Explore the topic')))
+        AND content_id NOT IN (
+            SELECT content_id 
+            -- list of content IDs with manually curated related links, generated using notebooks/2021_tests/get pages with manually curated links.ipynb
+            FROM `govuk-bigquery-analytics.datascience.manual_related_links_pages`)
         THEN 1 ELSE 0 END) AS navigation_clicked,
+
     MAX(CASE WHEN hit_type = 'PAGE' AND STARTS_WITH(pagePath, '/search?q=')
         THEN 1 ELSE 0 END) AS search_used,
     FROM
