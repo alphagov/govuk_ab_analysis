@@ -24,7 +24,13 @@ WITH relevant_fields AS (
     FROM
       hits.customDimensions
     WHERE
-      index=4) AS content_id
+      index=4) AS content_id,
+    (SELECT
+      value
+    FROM
+      hits.customDimensions
+    WHERE
+      index=2) AS doc_type
     FROM `govuk-bigquery-analytics.87773428.ga_sessions_*` AS sessions
     CROSS JOIN
     UNNEST(sessions.hits) AS hits
@@ -42,7 +48,7 @@ filtered_visitors AS (
     SELECT content_id 
     -- list of content IDs with manually curated related links, generated using notebooks/2021_tests/get pages with manually curated links.ipynb
     FROM `govuk-bigquery-analytics.datascience.manual_related_links_pages`)
-     AND doc_type NOT IN (
+    AND doc_type NOT IN (
         "html_publication",
         "homepage",
         "organisation",
