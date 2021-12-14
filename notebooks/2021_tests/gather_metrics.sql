@@ -42,6 +42,18 @@ filtered_visitors AS (
     SELECT content_id 
     -- list of content IDs with manually curated related links, generated using notebooks/2021_tests/get pages with manually curated links.ipynb
     FROM `govuk-bigquery-analytics.datascience.manual_related_links_pages`)
+     AND doc_type NOT IN (
+        "html_publication",
+        "homepage",
+        "organisation",
+        "finder",
+        "mainstream_browse_page",
+        "coronavirus_landing_page",
+        "travel_advice_index	",
+        "service_sign_in",
+        "step_by_step_nav",
+        "topic"
+    )
 ),
 
 per_visitor_table AS (
