@@ -20,7 +20,6 @@ WITH relevant_fields AS (
     visitNumber,
     hits.hitNumber AS hitNumber,
     hits.type AS hit_type,
-    hits.page.pagePath AS pagePath,
     hits.eventInfo.eventCategory AS eventCategory,
     hits.eventInfo.eventAction AS eventAction,
     (SELECT
@@ -29,12 +28,6 @@ WITH relevant_fields AS (
       hits.customDimensions
     WHERE
       index=4) AS content_id,
-    (SELECT
-      value
-    FROM
-      hits.customDimensions
-    WHERE
-      index=2) AS doc_type
     FROM `govuk-bigquery-analytics.87773428.ga_sessions_*` AS sessions
     CROSS JOIN
     UNNEST(sessions.hits) AS hits
@@ -65,7 +58,7 @@ counts_hits AS (
 ),
 
 purely_non_n2v_visitors AS (
-    SELECT DISTINCT date, fullVisitorId
+    SELECT date, fullVisitorId
     FROM counts_hits
     WHERE number_of_non_n2v_hits = number_of_hits
 ),
