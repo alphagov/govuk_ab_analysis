@@ -5,15 +5,11 @@
 -- visitors_that_clicked related links on pages that didn't have manually curated related links
 -- visitors_2_or_more related links that day
 -- visitors_that_clicked_navigation elements - home link, breadcrumbs, and "Explore this topic" links
--- visitors_that_used_search
 
 -- uses data created by notebooks/2021_tests/get pages with manually curated links.ipynb 
 -- that returns all the content items that have manually curated related links, this snapshot was
 -- uplaoded to BigQuery as `govuk-bigquery-analytics.datascience.manual_related_links_pages`
 -- removed "finder" as otherwise we wouldn't have internal page results
-
-DECLARE NO_N2V_DOCS ARRAY <STRING>;
-SET NO_N2V_DOCS = ["html_publication","homepage","organisation","mainstream_browse_page","coronavirus_landing_page","travel_advice_index","service_sign_in","step_by_step_nav","topic"];
 
 CREATE OR REPLACE TABLE `govuk-bigquery-analytics.datascience.control_manual_links_20211011_20211215_data` AS
 
@@ -51,8 +47,7 @@ WITH relevant_fields AS (
 flagged_hits AS (
     SELECT 
         *,
-        CASE WHEN content_id IN (SELECT content_id FROM `govuk-bigquery-analytics.datascience.manual_related_links_pages`) 
-            OR doc_type IN UNNEST(NO_N2V_DOCS) THEN 1
+        CASE WHEN content_id IN (SELECT content_id FROM `govuk-bigquery-analytics.datascience.manual_related_links_pages`)
         ELSE 0 
         END AS no_n2v_rl_pages 
     FROM relevant_fields 
@@ -88,9 +83,6 @@ per_visitor_table AS (
         OR (eventCategory = 'relatedLinkClicked' 
             AND CONTAINS_SUBSTR(eventAction, 'Explore the topic')))
         THEN 1 ELSE 0 END) AS navigation_clicked,
-
-    MAX(CASE WHEN hit_type = 'PAGE' AND STARTS_WITH(pagePath, '/search?q=')
-        THEN 1 ELSE 0 END) AS search_used,
     FROM
         relevant_fields
     INNER JOIN purely_non_n2v_visitors USING (date, fullVisitorId)
@@ -111,8 +103,6 @@ counts AS (
     -- indicate a user may not be finding what they are looking for and related links aren't helpful to them
     SUM(navigation_clicked) AS visitors_that_clicked_navigation,
     COUNT(DISTINCT CASE WHEN number_rl_clicked > 0 AND navigation_clicked = 0 THEN fullVisitorId END) AS visitors_that_clicked_rl_and_no_nav,
-    -- an increase in users searching may indicate that more users are lost and related links aren't helping
-    SUM(search_used) AS visitors_that_used_search
     FROM per_visitor_table
     GROUP BY 
     date
@@ -125,12 +115,10 @@ visitors_that_clicked_rl,
 visitors_2_or_more_rl,
 visitors_that_clicked_navigation,
 visitors_that_clicked_rl_and_no_nav,
-visitors_that_used_search,
 -- proportions
 ROUND(visitors_that_clicked_rl / visitors, 5) AS pc_visitors_used_rl,
 ROUND(visitors_2_or_more_rl / visitors, 5)  AS pc_visitors_2_or_more_rl,
 ROUND(visitors_2_or_more_rl / visitors_that_clicked_rl, 5) AS pc_visitors_returning_to_rl,
-ROUND(visitors_that_clicked_navigation / visitors, 5)  AS pc_visitors_that_clicked_navigation,
-ROUND(visitors_that_used_search / visitors, 5)  AS pc_visitors_that_used_search
+ROUND(visitors_that_clicked_navigation / visitors, 5)  AS pc_visitors_that_clicked_navigation
 FROM
 counts
